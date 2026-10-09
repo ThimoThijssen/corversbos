@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Corversbos">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>Corversbos</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+:root{--bg:#f2f2f7;--sheet:rgba(246,246,248,.84);--card:#fff;--txt:#000;--dim:#8a8a8e;--sep:rgba(60,60,67,.16);--fill:rgba(118,118,128,.12);--green:#34c759;--blue:#007aff;--red:#ff3b30;--orange:#ff9500;--shadow:0 6px 24px rgba(0,0,0,.16);--tabh:0px}
+@media (prefers-color-scheme:dark){:root{--bg:#000;--sheet:rgba(28,28,30,.84);--card:#2c2c2e;--txt:#fff;--dim:#98989f;--sep:rgba(84,84,88,.55);--fill:rgba(118,118,128,.24);--green:#30d158;--blue:#0a84ff;--red:#ff453a;--orange:#ff9f0a;--shadow:0 6px 24px rgba(0,0,0,.6)}}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font:17px/1.3 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-font-smoothing:antialiased;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+button:active{opacity:.6}
+input{font:inherit;-webkit-user-select:text;user-select:text}
+.hide{display:none!important}
+#map{position:fixed;inset:0;background:var(--bg)}
+.leaflet-top{top:env(safe-area-inset-top)}
+.leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.5)!important;border-radius:0 0 6px 0}
+.leaflet-tile-pane{filter:saturate(.8) contrast(.96)}
+@media (prefers-color-scheme:dark){.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.55) brightness(.9) contrast(.9)}}
+.off-forest{fill:#cfe6c4;fill-opacity:1;stroke:#7fb36f;stroke-width:2;stroke-dasharray:6 5}
+.off-road{stroke:#fff;stroke-width:5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.off-path{stroke:#9a7b55;stroke-width:2.2;fill:none;stroke-dasharray:4 4;stroke-linecap:round}
+@media (prefers-color-scheme:dark){.off-forest{fill:#16261a;stroke:#3d6b44}.off-road{stroke:#3a3a3c}.off-path{stroke:#a08560}}
+#offline{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translateX(-50%);z-index:950;padding:7px 14px;border-radius:18px;font-size:13px;font-weight:600;box-shadow:var(--shadow);display:flex;align-items:center;gap:6px}
+.glass{background:var(--sheet);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px)}
+
+/* kaartknoppen */
+.fab{position:fixed;right:10px;top:calc(env(safe-area-inset-top) + 10px);z-index:900;display:flex;flex-direction:column;border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.fab button{width:44px;height:44px;display:grid;place-items:center;color:var(--blue)}
+.fab button+button{border-top:.5px solid var(--sep)}
+
+/* bottom sheet */
+#sheet{position:fixed;left:0;right:0;bottom:0;height:calc(100% - env(safe-area-inset-top) - 40px);z-index:1000;border-radius:14px 14px 0 0;box-shadow:0 -1px 24px rgba(0,0,0,.14);display:flex;flex-direction:column;transition:transform .42s cubic-bezier(.2,.9,.25,1);will-change:transform;max-width:640px;margin:0 auto}
+#sheet.drag{transition:none}
+[data-drag]{touch-action:none}
+.grab{flex:none;padding:6px 0 2px}
+.grab i{display:block;width:36px;height:5px;border-radius:3px;background:var(--dim);opacity:.5;margin:0 auto}
+.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 16px calc(28px + var(--tabh) + env(safe-area-inset-bottom))}
+.hd{display:flex;align-items:center;gap:10px;padding:6px 0 8px}
+.hd h1{font-size:28px;font-weight:700;letter-spacing:.3px;flex:1}
+.hd .back{display:flex;align-items:center;gap:4px;color:var(--blue);font-size:17px;flex:1;height:36px}
+.circ{width:30px;height:30px;border-radius:50%;background:var(--fill);display:grid;place-items:center;color:var(--dim);flex:none}
+.circ.blue{color:var(--blue)}
+.lead{color:var(--dim);font-size:15px;margin:0 0 14px;line-height:1.4}
+.seg{display:flex;background:var(--fill);border-radius:9px;padding:2px;margin-bottom:14px}
+.seg button{flex:1;height:28px;font-size:13px;font-weight:500;border-radius:7px}
+.seg button:active{opacity:1}
+.seg button.on{background:var(--card);box-shadow:0 3px 8px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.04);font-weight:600}
+.group{background:var(--card);border-radius:12px;overflow:hidden}
+.cell{display:flex;align-items:center;gap:12px;padding:10px 14px 10px 10px;width:100%;text-align:left;position:relative}
+.cell+.cell::before{content:"";position:absolute;top:0;left:70px;right:0;border-top:.5px solid var(--sep)}
+button.cell:active{opacity:1;background:var(--fill)}
+.thumb{width:48px;height:48px;border-radius:11px;flex:none;display:grid;place-items:center}
+.cell .t{flex:1;min-width:0}
+.cell b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .m{font-size:14px;color:var(--dim);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chev{color:var(--dim);opacity:.55;flex:none}
+.done{font-size:13px;font-weight:600;color:var(--green);flex:none}
+.badge{font-size:12px;font-weight:600;padding:1px 7px;border-radius:6px}
+.sect{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.2px;margin:24px 16px 7px}
+.pill{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:50px;border-radius:14px;font-weight:600;background:var(--green);color:#fff}
+.pill.gray{background:var(--card);color:var(--blue)}
+.pill.red{background:var(--card);color:var(--red)}
+.pill+.pill{margin-top:10px}
+.sq{width:50px;height:50px;border-radius:14px;background:var(--card);color:var(--blue);display:grid;place-items:center;flex:none}
+.link{display:block;margin:16px auto 0;color:var(--dim);font-size:14px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.tile{background:var(--card);border-radius:12px;padding:9px 12px;min-width:0}
+.tile span{font-size:12px;color:var(--dim);display:block}
+.tile b{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tile b small{font-size:14px;font-weight:500;color:var(--dim);margin-left:2px}
+.desc{font-size:15px;color:var(--dim);margin-bottom:14px;line-height:1.4}
+.warn{display:flex;gap:10px;align-items:flex-start;background:rgba(255,159,10,.14);color:var(--txt);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:10px;line-height:1.35}
+.tip{display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:12px;padding:12px;margin-bottom:14px;font-size:14px;line-height:1.35}
+.tip img{width:40px;height:40px;border-radius:9px;flex:none}
+.tip b{display:block;font-size:15px}
+.tip .circ{width:24px;height:24px}
+.field{width:100%;height:46px;border-radius:12px;border:0;background:var(--card);color:var(--txt);padding:0 14px;outline:none;font-size:17px}
+.row{display:flex;gap:10px;margin-top:10px}
+.row .pill{margin:0}
+.counter{text-align:center;font-size:15px;color:var(--dim);margin:14px 0 4px;font-variant-numeric:tabular-nums}
+.rec{color:var(--red)!important}
+.rec::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red);margin-right:6px;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.2}}
+
+/* weerkaart */
+.wx{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:12px;padding:10px 14px;margin-bottom:14px}
+.wx .i{font-size:30px;line-height:1}
+.wx .t{flex:1;min-width:0}
+.wx b{display:block;font-size:16px;font-weight:600}
+.wx span{font-size:13px;color:var(--dim)}
+.wx .s{text-align:right;flex:none}
+.wx .s b{font-size:16px;font-variant-numeric:tabular-nums}
+.wx.load{color:var(--dim);font-size:14px;justify-content:center;min-height:58px}
+
+/* logboek */
+.badges{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.bdg{background:var(--card);border-radius:14px;padding:12px 6px 10px;text-align:center}
+.bdg .e{width:52px;height:52px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;font-size:28px;background:linear-gradient(145deg,#ffd60a,#ff9f0a);box-shadow:0 4px 14px rgba(255,159,10,.35)}
+.bdg.locked .e{background:var(--fill);box-shadow:none;filter:grayscale(1);opacity:.45}
+.bdg b{display:block;font-size:13px;font-weight:600;line-height:1.2}
+.bdg span{display:block;font-size:11px;color:var(--dim);margin-top:2px;line-height:1.2}
+
+/* tabbalk */
+#tabbar{position:fixed;left:0;right:0;bottom:0;z-index:1100;display:flex;padding:7px 0 calc(env(safe-area-inset-bottom) + 3px);border-top:.5px solid var(--sep)}
+#tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--dim);font-size:10px;font-weight:500}
+#tabbar button:active{opacity:1}
+#tabbar button.on{color:var(--blue)}
+#tabbar svg{height:25px}
+
+/* markers */
+.me{width:22px;height:22px;border-radius:50%;background:#0a84ff;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.35);position:relative}
+.me::after{content:"";position:absolute;inset:-14px;border-radius:50%;background:#0a84ff;animation:pulse 2.2s ease-out infinite;z-index:-1}
+@keyframes pulse{from{transform:scale(.3);opacity:.5}to{transform:scale(1.3);opacity:0}}
+.flag{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.35);display:grid;place-items:center;color:#fff}
+.dot{width:12px;height:12px;border-radius:50%;background:#ff9f0a;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sdot{width:14px;height:14px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.pin{width:26px;height:26px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:grid;place-items:center}
+.pin i{transform:rotate(45deg);font-style:normal;color:#fff;font-size:12px;font-weight:700}
+.chevm{width:14px;height:14px;animation:fadein .4s 1s both}
+@keyframes fadein{from{opacity:0}}
+.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.2s cubic-bezier(.5,0,.3,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* toast & modal */
+#toast{position:fixed;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translate(-50%,-160%);z-index:3500;padding:10px 18px;border-radius:22px;font-size:15px;font-weight:600;box-shadow:var(--shadow);transition:transform .35s cubic-bezier(.2,.9,.25,1);white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+#toast.show{transform:translate(-50%,0)}
+#modal{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.mcard{width:100%;max-width:420px;background:var(--bg);border-radius:22px;padding:20px;animation:up .4s cubic-bezier(.2,.9,.25,1)}
+@keyframes up{from{transform:translateY(110%)}}
+.mcard h2{font-size:22px;margin:10px 0 4px}
+
+/* navigatiescherm (Zoek mijn-stijl) */
+#follow{position:fixed;inset:0;z-index:2000;background:#000;color:#fff;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 8px) 20px calc(env(safe-area-inset-bottom) + 14px);transition:background .45s ease}
+#follow.al{background:#1e9b45}
+#follow.off{background:#3a2400}
+#follow.hot{background:#b8410f}
+.ftop{display:flex;align-items:center;gap:12px;min-height:44px}
+.ftop .ttl{flex:1;text-align:center;min-width:0}
+.ftop .ttl b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ftop .ttl span{font-size:13px;opacity:.65}
+.fbtn{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.16);display:grid;place-items:center;color:#fff;flex:none}
+.stage{flex:1;position:relative;display:grid;place-items:center;min-height:200px}
+#ring{position:absolute;left:50%;top:50%;width:min(74vw,300px,38vh);height:min(74vw,300px,38vh);transform:translate(-50%,-50%) rotate(-90deg);overflow:visible}
+#ringP{transition:stroke-dasharray .6s ease}
+#dots{position:absolute;inset:0;width:100%;height:100%}
+#arrow{position:relative;width:min(36vw,150px,20vh);height:min(36vw,150px,20vh);transition:transform .25s linear,opacity .3s;filter:drop-shadow(0 8px 24px rgba(0,0,0,.35))}
+#dist{font-size:min(22vw,92px);font-weight:700;letter-spacing:-2px;line-height:1;font-variant-numeric:tabular-nums}
+#dist small{font-size:.38em;font-weight:600;letter-spacing:0;margin-left:6px;opacity:.75}
+#dir{font-size:28px;font-weight:600;margin-top:4px}
+#next{font-size:16px;opacity:.8;margin-top:6px;min-height:21px;display:flex;align-items:center;gap:8px}
+#next svg{flex:none}
+.fstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 12px}
+.fstats div{background:rgba(255,255,255,.12);border-radius:12px;padding:8px 11px}
+.fstats span{font-size:12px;opacity:.65;display:block}
+.fstats b{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.factions{display:flex;gap:10px}
+.factions button{flex:1;height:48px;border-radius:14px;background:rgba(255,255,255,.16);color:#fff;font-weight:600;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px}
+.conf{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+#found{position:absolute;inset:0;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:24px}
+.fcard{background:#1c1c1e;border-radius:26px;padding:0 22px 20px;text-align:center;max-width:380px;width:100%;animation:pop .5s cubic-bezier(.3,1.5,.5,1)}
+.femoji{font-size:60px;width:112px;height:112px;margin:-56px auto 12px;border-radius:50%;background:linear-gradient(145deg,#ffd60a,#ff9f0a);display:grid;place-items:center;box-shadow:0 10px 40px rgba(255,159,10,.5);border:5px solid #1c1c1e}
+.fsmall{font-size:13px;opacity:.6;text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.fcard h2{font-size:25px;margin:4px 0 8px}
+.fcard p{opacity:.8;margin:0 0 20px;line-height:1.45;font-size:16px}
+#finish{position:absolute;inset:0;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 20px);text-align:center;overflow-y:auto}
+.fin-in{width:100%;max-width:380px;display:flex;flex-direction:column;align-items:center;margin:auto 0;position:relative;z-index:3}
+.fin-check{width:84px;height:84px;border-radius:50%;background:#30d158;display:grid;place-items:center;margin-bottom:16px;animation:pop .55s cubic-bezier(.3,1.6,.5,1);box-shadow:0 10px 40px rgba(48,209,88,.5);flex:none}
+@keyframes pop{from{transform:scale(0)}}
+#finish h2{font-size:26px;font-weight:700}
+#finish p{opacity:.7;margin:6px 0 0;font-size:16px}
+#finMap{width:100%}
+#finMap svg{display:block;width:100%;height:150px;background:rgba(255,255,255,.07);border-radius:16px;margin-top:18px}
+#finish .fstats{width:100%;margin:12px 0}
+#finBadges{width:100%}
+.nb{display:flex;align-items:center;gap:12px;background:rgba(255,214,10,.16);border-radius:14px;padding:10px 12px;margin-bottom:8px;text-align:left;animation:pop .5s cubic-bezier(.3,1.5,.5,1) both}
+.nb .e{font-size:28px}
+.nb b{display:block;font-size:15px}
+.nb span{font-size:13px;opacity:.7}
+#finOk{margin-top:6px}
+#mapbar{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:1500;height:56px;border-radius:16px;background:#000;color:#fff;display:flex;align-items:center;gap:12px;padding:0 16px;box-shadow:0 8px 30px rgba(0,0,0,.4);max-width:600px;margin:0 auto}
+#mapbar b{flex:1;text-align:left;font-size:16px}
+#mapbar span{color:#30d158;font-weight:600}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="fab glass">
+  <button id="locBtn" aria-label="Mijn locatie"><svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor"><path d="M21.5 2.5 2.8 10.4c-.8.4-.7 1.5.1 1.7l7.4 1.6 1.6 7.4c.2.8 1.3.9 1.7.1z"/></svg></button>
+  <button id="forestBtn" aria-label="Heel het bos"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 7 9h2.6L6 14h4.5v-.1L6 20h5v2h2v-2h5l-4.5-6.1V14H18l-3.6-5H17z"/></svg></button>
+</div>
+
+<div id="sheet" class="glass">
+  <div class="grab" data-drag><i></i></div>
+  <div class="view" id="vList"></div>
+  <div class="view hide" id="vLog"></div>
+  <div class="view hide" id="vDetail"></div>
+  <div class="view hide" id="vMake">
+    <div class="hd" data-drag><h1 id="makeTitle">Nieuwe route</h1><button class="circ" id="cancelMake" aria-label="Annuleren"><svg width="11" height="11" viewBox="0 0 14 14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 2l10 10M12 2 2 12"/></svg></button></div>
+    <p class="lead" id="makeLead"></p>
+    <input class="field" id="name" placeholder="Naam" autocomplete="off">
+    <div class="counter" id="makeInfo"></div>
+    <div class="row"><button class="pill gray" id="undoBtn">Ongedaan maken</button><button class="pill gray" id="recBtn">Opnemen</button></div>
+    <button class="pill" id="saveBtn" style="margin-top:10px">Bewaren</button>
+  </div>
+</div>
+
+<nav id="tabbar" class="glass">
+  <button data-tab="routes" class="on"><svg viewBox="0 0 26 24" width="27"><path d="M4 19c4-1 3.5-7 8-8s5 4 9 2 1.5-7 1.5-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="4" cy="19" r="2.6" fill="currentColor"/><circle cx="22.5" cy="6" r="2.6" fill="currentColor"/></svg>Routes</button>
+  <button data-tab="hunts"><svg viewBox="0 0 24 24" width="25" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.8"/><path d="m15.6 15.6 5.2 5.2"/><path d="m10.5 7.4.9 2.1 2.2.2-1.7 1.5.5 2.2-1.9-1.2-1.9 1.2.5-2.2-1.7-1.5 2.2-.2z" fill="currentColor" stroke="none"/></svg>Speurtocht</button>
+  <button data-tab="log"><svg viewBox="0 0 24 24" width="25" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M8 2h8l-2.2 6.5h-3.6z"/><circle cx="12" cy="15" r="6.3"/><path d="m12 11.6 1.1 2.2 2.4.3-1.7 1.6.4 2.4-2.2-1.2-2.2 1.2.4-2.4-1.7-1.6 2.4-.3z" fill="currentColor" stroke="none"/></svg>Logboek</button>
+</nav>
+
+<div id="toast" class="glass"></div>
+<div id="offline" class="glass hide"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0M3 3l18 18"/></svg>Offline · bos-kaart</div>
+<div id="modal" class="hide"><div class="mcard" id="mcard"></div></div>
+<button id="mapbar" class="hide"><svg width="20" height="20" viewBox="0 0 24 24" fill="#30d158"><path d="M12 3 20 20 12 16 4 20z"/></svg><b id="mapbarName"></b><span>Terug</span></button>
+
+<div id="follow" class="hide">
+  <div class="ftop">
+    <button class="fbtn" id="stopBtn" aria-label="Stop"><svg width="13" height="13" viewBox="0 0 14 14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 2l10 10M12 2 2 12"/></svg></button>
+    <div class="ttl"><b id="fname"></b><span id="fstep"></span></div>
+    <button class="fbtn" id="soundBtn" aria-label="Geluid"></button>
+  </div>
+  <div class="stage">
+    <svg id="ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1.2"/><circle id="ringP" cx="50" cy="50" r="48" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/></svg>
+    <canvas id="dots"></canvas>
+    <svg id="arrow" viewBox="0 0 100 100"><path d="M50 8 82 42H61v48H39V42H18z" fill="#fff" stroke="#fff" stroke-width="7" stroke-linejoin="round"/></svg>
+  </div>
+  <div>
+    <div id="dist">–</div>
+    <div id="dir">GPS zoeken…</div>
+    <div id="next"></div>
+  </div>
+  <div class="fstats"><div><span>Tijd</span><b id="sTime">0:00</b></div><div><span>Gelopen</span><b id="sWalk">0 m</b></div><div><span>Nog</span><b id="sLeft">–</b></div></div>
+  <div class="factions">
+    <button id="mapBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>Kaart</button>
+    <button id="simBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg><span>Simuleer</span></button>
+  </div>
+
+  <div id="found" class="hide">
+    <canvas class="conf" id="foundConf"></canvas>
+    <div class="fcard">
+      <div class="femoji" id="foundEmoji"></div>
+      <div class="fsmall" id="foundStep"></div>
+      <h2 id="foundTitle"></h2>
+      <p id="foundText"></p>
+      <button class="pill" id="foundNext">Volgende schat</button>
+    </div>
+  </div>
+
+  <div id="finish" class="hide">
+    <canvas class="conf" id="confetti"></canvas>
+    <div class="fin-in">
+      <div class="fin-check"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9.5 17 19 7"/></svg></div>
+      <h2 id="finTitle"></h2>
+      <p id="finSub"></p>
+      <div id="finMap"></div>
+      <div class="fstats"><div><span>Tijd</span><b id="finTime"></b></div><div><span>Afstand</span><b id="finDist"></b></div><div><span>Tempo</span><b id="finPace"></b></div></div>
+      <div id="finBadges"></div>
+      <button class="pill" id="finOk">Klaar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const DEMO_ROUTES=[{"name":"Mini-rondje","demo":true,"pts":[[52.230493,5.152212],[52.230485,5.151698],[52.230477,5.151184],[52.230619,5.150811],[52.23091,5.150619],[52.231199,5.150465],[52.231173,5.150977],[52.231181,5.151482],[52.231192,5.151995],[52.230981,5.15217],[52.230666,5.152197],[52.230493,5.152212]]},{"name":"Korte ronde","demo":true,"pts":[[52.232628,5.150048],[52.232639,5.150562],[52.232649,5.151075],[52.23266,5.151589],[52.232616,5.152029],[52.232301,5.152033],[52.231994,5.15208],[52.231679,5.152106],[52.231365,5.152136],[52.231189,5.15191],[52.231192,5.151399],[52.231176,5.150892],[52.231243,5.150447],[52.231557,5.150415],[52.231825,5.150254],[52.232062,5.150055],[52.232377,5.150051],[52.232628,5.150048]]},{"name":"Boswandeling","demo":true,"pts":[[52.225251,5.14537],[52.225565,5.145359],[52.22588,5.145348],[52.226195,5.145337],[52.226508,5.145307],[52.226823,5.145291],[52.227137,5.145276],[52.227452,5.14526],[52.22766,5.145014],[52.227654,5.1445],[52.227647,5.143986],[52.22764,5.143472],[52.227633,5.142959],[52.227626,5.142445],[52.227619,5.141931],[52.227332,5.1419],[52.227018,5.141916],[52.226703,5.141928],[52.226388,5.141938],[52.226074,5.141948],[52.225759,5.141952],[52.225445,5.141971],[52.225225,5.142216],[52.225226,5.14273],[52.225224,5.143244],[52.225221,5.143758],[52.225218,5.144272],[52.225233,5.144785],[52.225251,5.14537]]},{"name":"Corversronde","demo":true,"pts":[[52.225251,5.14537],[52.225565,5.145359],[52.22588,5.145348],[52.226195,5.145337],[52.226508,5.145307],[52.226823,5.145291],[52.227137,5.145276],[52.227452,5.14526],[52.227666,5.145309],[52.227676,5.145823],[52.227687,5.146336],[52.227698,5.14685],[52.227709,5.147364],[52.22772,5.147877],[52.22773,5.148391],[52.227741,5.148904],[52.227752,5.149418],[52.227763,5.149931],[52.227722,5.150365],[52.227407,5.150374],[52.227092,5.150384],[52.226778,5.150393],[52.226463,5.150403],[52.226148,5.150419],[52.225834,5.150437],[52.225519,5.150447],[52.225206,5.15042],[52.224899,5.150313],[52.224803,5.149959],[52.224813,5.149445],[52.224823,5.148932],[52.224833,5.148418],[52.224842,5.147905],[52.224854,5.147391],[52.224866,5.146878],[52.224878,5.146364],[52.22489,5.145851],[52.224967,5.145382],[52.225251,5.14537]]},{"name":"Grote ronde","demo":true,"pts":[[52.225251,5.14537],[52.224942,5.145412],[52.224889,5.145901],[52.224877,5.146415],[52.224865,5.146928],[52.224853,5.147442],[52.224841,5.147955],[52.224832,5.148469],[52.224822,5.148983],[52.224812,5.149496],[52.224802,5.15001],[52.22493,5.150316],[52.225236,5.150432],[52.22555,5.150448],[52.225865,5.150435],[52.226179,5.150417],[52.226494,5.150402],[52.226809,5.150392],[52.227123,5.150383],[52.227438,5.150373],[52.227753,5.150364],[52.228068,5.150356],[52.228382,5.150348],[52.228599,5.149993],[52.228819,5.149626],[52.229055,5.149291],[52.2293,5.14897],[52.229547,5.148652],[52.229804,5.148356],[52.230069,5.148078],[52.230311,5.14775],[52.2304,5.147306],[52.23039,5.146792],[52.23038,5.146279],[52.230371,5.145765],[52.230361,5.145251],[52.230352,5.144738],[52.230342,5.144224],[52.230333,5.14371],[52.230323,5.143197],[52.230313,5.142683],[52.230304,5.142169],[52.230213,5.141788],[52.229898,5.141795],[52.229583,5.141803],[52.229269,5.14181],[52.228954,5.141817],[52.228639,5.141833],[52.228325,5.141849],[52.22801,5.141865],[52.227696,5.141881],[52.227381,5.141897],[52.227066,5.141913],[52.226752,5.141926],[52.226437,5.141936],[52.226122,5.141946],[52.225808,5.141952],[52.225493,5.141963],[52.225223,5.142137],[52.225227,5.142651],[52.225224,5.143165],[52.225221,5.143678],[52.225219,5.144192],[52.22523,5.144706],[52.225246,5.145219],[52.225251,5.14537]]}];
+// Speurtocht langs echte plekken uit OpenStreetMap
+const DEMO_HUNT={id:'demo-hunt-1',type:'hunt',demo:true,name:'Bosspeurtocht',color:'#ff9f0a',
+  pts:[[52.230527,5.152604],[52.227153,5.153429],[52.226827,5.149156],[52.229065,5.14847],[52.230542,5.147629],[52.228455,5.150315]],
+  cps:[
+    {e:'🪑',n:'Het bankje',h:'Een bankje aan de rand van het bos',t:'Je eerste schat! Ga even zitten en tel hoeveel verschillende vogels je in één minuut hoort.'},
+    {e:'🐝',n:'De Bijenschans',h:'Luister goed… hoor je iets zoemen?',t:'Hier houden imkers hun bijen. Een bijenschans is een beschutte plek voor bijenkasten, met een wal eromheen tegen de wind. Kijk maar, kom niet te dichtbij!'},
+    {e:'🌳',n:'De eenzame boom',h:'Een boom die helemaal op zichzelf staat',t:'Sla je armen om de stam. Raken je handen elkaar? Hoe dikker de stam, hoe ouder de boom.'},
+    {e:'💺',n:'Bankje Job',h:'Dit bankje heeft een eigen naam',t:'Dit bankje heet Job. Het heeft geen rugleuning: probeer er eens op te balanceren!'},
+    {e:'👣',n:'Het voetstappenpaaltje',h:'Zoek een betonnen paaltje',t:'Zie je de witte voetafdruk? Dit paaltje hoort bij het Voetstappenpad van het Goois Natuurreservaat.'},
+    {e:'🏆',n:'De laatste schat',h:'Nog zo’n paaltje met een voetafdruk',t:'Je hebt alle schatten van het Corversbos gevonden. Echte speurneus!'}
+  ]};
+const OFFLINE={"b":"coy}Hwok^mBuCt@yCbBvBx@yAlAlC[tAbArDh@i@x@{@x@y@p@q@bAcAjDgDlAkAnByAKwOCwECuECoKCqGEsGzCQM}QjBrAnC~BZ\\dEzD`Ax@t@h@t@`@|@Z|@PrCBvAExDIrCGn@Ph@j@bArBhArCTj@Gn@O|@Bt@@j@B|@uBbq@p@JDDBPo@pQSTE`AY?kC@cB@?cAmFFkABEeE?g@wDJwIPsBDyCByORyGHuCB}A@uCJoADQINi@~CNbBmH","m":["agx}Hqkl^KySA{AAaDA{ACaGAiGMs@kBoEqCcHKUBS","sfw}H{vk^WAQ?a@AQ?oB?","ozx}Ha|m^y@hDaA`EsB`Ig@rBSf@Q|@Qz@GPm@dCI\\GNK^AJQp@e@|AoBfIWfAi@vBqAfFELuBzI{AbGIJCHGb@M^","__w}Hqgm^K?K?}B[ESAOD[","{vw}H_cm^E[G{LAmCLY","cxy}H}dk^BIBGRmAZmAfD}MDOxAgGd@gAZoAhCsLp@iCv@_DR{@Pe@Ji@`@iBtC}KbBgH`CqJFWNa@DKNe@Ha@Pu@J_@FQ","m_w}Hkpm^DEFG","i_w}Hunm^FT","m_w}Hkpm^DL@D?BC\\","uay}H{{m^t@aA","ogy}Hs{m^n@n@","_zx}Hs{m^EE","i|x}Hwvm^UO]AUOQ@","ucy}Ho~m^@^JXO~@k@X","cay}Hsym^RNXJN^?r@Op@QP]L","gcy}Hu|m^VJXLLZBj@Yb@STEl@","}~v}H{mm^BBF?DAF@FHv@pB","{}x}Hwml^CHETQn@[lAqAjFEHMDI?","c`y}Hgil^NL","kcw}Hiyj^KCGK?Y@QL_CBq@DQ","}jw}Hc`k^d@?@V?Jg@@?e@","i`w}Huqm^Zh@","ixy}Huek^LDFAR?fHI","efy}Hwxl^GG","kvx}Hygn^DD","ghy}Hytl^HB","aly}Hyfl^KQ","umy}Hkel^JP","sfw}Horm^XMj@Ix@GPBRNJFHJLP","mtx}Hk~k^HBHAlCcCVUTW","agx}Hqkl^x@qA|AcBnAeBd@q@PStAoCXq@","whw}Hc~m^CmABqAMm@VeHNgEXoD","}_w}Hi_n^HPFRBb@OlBm@x@","wmy}H{ek^FGt@u@`A_ATUTSrCkChEmE~A}AdBaB~@gANIHB","kcw}Hw`k^TF","kcw}Hw`k^EGUc@Y[MEIEGKU_AMYSSMMKEG?_@@e@AgEFiCHaA?iEHiGL","wmy}H{ek^N@xCGnBDhPWtGIHBJN`@AzAC","mzw}H}cn^CtB","gly}H_{m^f@Pn@LLNPN","wny}Hmzm^Vk@?{@","_ny}Hy{m^v@XRyA","i_w}Hunm^E^BP","_aw}Heuk^iAOsAc@UA","ktx}Hcpn^B\\?PEVOh@WfAUnAcCvJ","mcy}Heam^CGCC","yux}Hw{m^v@C","sjy}H_om^GCSICCKGIKEKGOGSEMGIGGICMEKAKAC?SBSDIFILEBG@ICE_AAk@?C","sky}Hqom^AU?M@IBQDUTu@BQ@OEYEOAs@K_@MISGEEECEAE@CBC@C?C?EBCBGNWn@CFCTAZ?B?d@?b@","qux}Hmin^JLBBHL","wtx}Hmhn^AJ@R@LBHDDDDD@DCBABG?G@KAQCKAIECEEE?E@A@EH","}tx}H_bn^?}@?O@KBOBQ@Y","}{v}Hkbn^o@vGCZCZMlAETQZMLKL","u_w}H_sm^CBCB","}_w}Hwrm^GHCV","__w}Hypm^@EDC","w~v}Hcqm^FIDI","a_w}H_nm^BB","}mx}H{cl^nB{BjByB","qzw}Hu|l^tBiENYnAiAvDoDdC{Bt@m@r@q@","kty}Ha{m^`BNBBDHDLHVH\\HVDRHRBF@D","_iw}H_wk^A}B`@?@~B","s_y}Hyhl^LN","ifx}Hegk^ASUwb@"],"p":["qbw}Hqak^SFIASe@KOQKOKGIY}@Si@QQWI","ghy}Ha_k^IAG?Y?a@@IJQPM?MIUQY?WAm@Bk@J","oqy}Hq~j^I@","mew}Hkim^?D?FJDj@H","{cw}Hofm^CbI","suw}Hwgk^?q@G}Q","_~w}Hkgk^IqOGuMA}E?u@Bm@?mAC{AKsEA}ECyFI_O","__x}Hs|l^hBGNDR?","mmw}Hi}k^E_@GgNAmN","sfw}H{vk^AbK@n@BpACR","ymw}Hmom^VgAHqAJ_AReAF}A@IDs@@O","ymw}Hmom^o@@mAJAi@Ma@k@?Cw@EgAM[SIg@IUC","wqw}H_om^S?","wvw}Hexm^IOCg@CQkAA}@a@o@BkABiGE","qpx}Homn^e@_@YQCA","mdy}Hauk^Dl@@`@@l@@TH\\Hp@CXIz@EV","mux}Hqhm^DLB^AXF~H?n@DxFHrS","_tx}H}pk^uEd@kHfD","uzx}Hwok^GeAAs@LcAB{@?Y?O","mtx}Hk~k^bDaDj@i@NOrDkEV@","mtx}Hk~k^LlL","cux}Hcgm^\\C\\?ZBR?JIpAGxAGlCK","mgx}Hk`m^k@f@eBx@aBHM?ENMXCX?`@DfMDvCD`@@r@HT","_lx}H}gm^BbB?ZAV?VB\\Av@Aj@A`@Hh@?fAA|CGhAU`BOxAIlBMxB?R?Z","gpx}H{zl^uC@","}tx}Hi|l^QWs@eBUy@","ksx}Hy_k^Rx\\f@jn@","e{w}Hu|l^bCeF","aiw}Hmxn^ATE`AM`D?bCArAInBKfBQvCCP","ifx}Hegk^o@Ak@Bm@H_HP","{uw}Hg|k^Uo_@AcDGc@","suw}Hwgk^kGJiGD","mmw}Hi}k^MBiFHUR","{{v}Hy}l^KEA^En@IbAKlCExAEv@EpAGjBO|DKfCMfDMdDIlCCx@GzACTGnBOzCIxA?TBTJ^","ssx}Hgfk^FlE","uvw}Hazm^?y@","wvw}Huxm^@k@","uvw}H{{m^?uA?I@U","{ex}Hwmj^EiEEaN?g@","}jw}H}~j^@`C@rBf@AAsBAaC","{iw}Hehk^?L@J@fF@V?Jg@@?e@CiF?K?K","onw}Hwzj^AiB@IFCTABB@FBjB?hBAHEBY@CKAkB","iew}Huwj^Aq@?y@AkB?K","gfw}Huwj^?q@Ay@?wAAS?O","cgw}Hqwj^As@?y@AwA?c@","iqw}H_hk^?L?FBhE","ucw}Hmhm^E|@","{cw}Hofm^a@BYGSSC_E@cAEcB","yfw}Hq}k^sEF","ahy}Hcvj^C{CAaC","iww}Hwqm^G?","}mw}H_}l^vCIhA@z@V^B","_dw}Hk|l^GzMI~LCl@ILy@@","ssx}Hgfk^iPT","qhw}Hghk^n@GLW","ghy}Ha_k^CoBAeB","}dy}Hqek^oBE","mhy}Hwek^cDDuCFuCDY@GEIM","_tx}H}pk^JhI?J","gfx}Hkdk^Ae@?]","ubx}Hktj^FWCo@Bk@Lw@Jo@Ho@Bg@Ae@Ci@C]G_@GQ","ady}Hojk^CZIj@Ir@CV?H","qmy}Hqek^HGbC}B","qhw}Hghk^i@@e@?gEDiCF","ifx}Hofk^?U","wfw}Hwek^BI","mhy}Hwek^?I","suw}Hwgk^?N","ciy}Hwik^@W","oxy}Hs~j^@WDKHsADuA","khy}Hckk^Mk@{@cB_B[UWI}@c@s@MeA[iAGIKI","sdx}Hgpn^Bp@^\\d@U\\g@BCHELDNYHk@DM?SEI]q@Q]KLQ^Mj@","sky}Hy}m^@SVJNBLEZBNDJNGn@M`@Gf@","yfw}Hq}k^DtE","egx}H_fn^IXE|ACtE","}vw}H_wm^De@","}mw}H_}l^EsMAcAJu@","qzw}Hu|l^~BArGG","yqy}Ho~j^_@F_@B[Ai@Q_@Ca@@MDQL","sfw}Hein^D?DADAFEDEHKN[DOBMBK?I?M?MAWMC","qzw}Hg`n^?LW@]Da@A}@o@YGkBwBQMc@OSMu@_AIEDc@","ocw}He_k^IC{DA","wcy}Hook^n@a@xFyF~D_E","_bx}H_ck^o@Qg@KQCSGIA","avw}H{oj^GeNCc@C]G_@Ua@WUQASVOFS@SGOIMUKYOAk@LOf@EZUBWKWMWB","}pw}Hspk^FG","e_y}Hihl^?@DLDNDPVbA","e_y}Hghl^NY","__y}Hygl^PS","y~x}Higl^PQ","ksw}He~m^DJHDF?D@D?D@D@@@D?B@N?D?L@V@b@AHAH@D?D?B?RABAF?B@BAB?F@","wkw}Hi}m^BAJ@HAL?H?F?D?FCF@B@D?B?BAB?BCDAB@D?@@DAB?D@D?D?F@FAHCFAHCt@Ah@Cf@G`@CTK","wvw}Hexm^?O"]};
+const FOREST=[[52.2239881,5.1404652],[52.2382005,5.1582475]],CENTER=[52.2311,5.1497];
+const ARRIVE=15,HUNT_RADIUS=20,START_RADIUS=30,OFF_ROUTE=40,VERSION=3;
+const KEY='corversbos-routes',HKEY='corversbos-history',TIPKEY='corversbos-tip',SKEY='corversbos-sound',VKEY='corversbos-version';
+const COLORS=['#30d158','#0a84ff','#ff9f0a','#bf5af2','#ff375f','#64d2ff','#ffd60a'];
+const HUNT_EMOJI=['⭐','🍄','🦊','🐿️','🌰','🦉','🪵','🌼','🐞','🦔'];
+const LEVELS={kort:{l:'Kort',c:'#30d158'},middel:{l:'Middel',c:'#0a84ff'},lang:{l:'Lang',c:'#bf5af2'}};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const ICON={
+  chev:'<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m1.5 1.5 5 5.5-5 5.5"/></svg>',
+  back:'<svg width="11" height="19" viewBox="0 0 11 19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2 2 9.5 9 17"/></svg>',
+  x:'<svg width="11" height="11" viewBox="0 0 14 14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M2 2l10 10M12 2 2 12"/></svg>',
+  plus:'<svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" fill="none"><path d="M12 4v16M4 12h16"/></svg>',
+  play:'<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>',
+  share:'<svg width="19" height="22" viewBox="0 0 14 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V1M3.5 4.5 7 1l3.5 3.5M4 7H2v10h10V7h-2"/></svg>',
+};
+
+/* ---------- geo ---------- */
+const R=6371000,rad=d=>d*Math.PI/180,deg=r=>r*180/Math.PI;
+function dist(a,b){const dLa=rad(b[0]-a[0]),dLo=rad(b[1]-a[1]);const h=Math.sin(dLa/2)**2+Math.cos(rad(a[0]))*Math.cos(rad(b[0]))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+function bearing(a,b){const y=Math.sin(rad(b[1]-a[1]))*Math.cos(rad(b[0]));const x=Math.cos(rad(a[0]))*Math.sin(rad(b[0]))-Math.sin(rad(a[0]))*Math.cos(rad(b[0]))*Math.cos(rad(b[1]-a[1]));return (deg(Math.atan2(y,x))+360)%360}
+const turnAngle=(a,b)=>((b-a+540)%360)-180;
+const pathLen=pts=>pts.reduce((s,p,i)=>i?s+dist(pts[i-1],p):0,0);
+function segDist(p,a,b){ // afstand punt tot lijnstuk, lokaal plat benaderd
+  const k=Math.cos(rad(p[0])),ax=(a[1]-p[1])*k,ay=a[0]-p[0],bx=(b[1]-p[1])*k,by=b[0]-p[0];
+  const dx=bx-ax,dy=by-ay,L=dx*dx+dy*dy,t=L?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/L)):0;
+  return Math.hypot(ax+dx*t,ay+dy*t)*111320;
+}
+const fmt=m=>Math.round(m)>=1000?(m/1000).toFixed(1).replace('.',',')+' km':Math.round(m)+' m';
+const fmtTime=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,'0');return h?`${h}:${String(m).padStart(2,'0')}:${x}`:`${m}:${x}`};
+const fmtDur=s=>{const m=Math.round(s/60);return m<60?`${m}<small>min</small>`:`${Math.floor(m/60)}<small>u</small> ${m%60}<small>m</small>`};
+const unit=s=>s.replace(/ (k?m)$/,'<small>$1</small>');
+const hhmm=t=>new Date(t).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+const minutes=m=>Math.max(1,Math.round(m/1.25/60)); // ~4,5 km/u
+const level=m=>m<700?'kort':m<1500?'middel':'lang';
+const isLoop=r=>dist(r.pts[0],r.pts[r.pts.length-1])<30;
+
+/* ---------- delen via link (route zit in de link zelf) ---------- */
+function encPoly(pts){let o='',pa=0,pb=0;const e=v=>{v=v<0?~(v<<1):v<<1;let s='';while(v>=32){s+=String.fromCharCode((32|(v&31))+63);v>>=5}return s+String.fromCharCode(v+63)};for(const[a,b]of pts){const A=Math.round(a*1e5),B=Math.round(b*1e5);o+=e(A-pa)+e(B-pb);pa=A;pb=B}return o}
+function decPoly(s){const pts=[];let i=0,a=0,b=0;const d=()=>{let r=0,sh=0,c;do{c=s.charCodeAt(i++)-63;r|=(c&31)<<sh;sh+=5}while(c>=32);return r&1?~(r>>1):r>>1};while(i<s.length){a+=d();b+=d();pts.push([a/1e5,b/1e5])}return pts}
+const b64e=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const b64d=s=>decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/'))));
+function shareLink(r){
+  const data={t:r.type,n:r.name,c:r.color,p:encPoly(r.pts)};
+  if(r.cps)data.k=r.cps.map(c=>[c.e,c.n,c.h||'',c.t||'']);
+  return location.origin+location.pathname+'#deel='+b64e(JSON.stringify(data));
+}
+async function shareRoute(r){
+  const url=shareLink(r),text=r.type==='hunt'?`Doe de speurtocht “${r.name}” in het Corversbos`:`Loop de route “${r.name}” in het Corversbos`;
+  try{if(navigator.share){await navigator.share({title:r.name,text,url});return}}catch(e){if(e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(url);toast('Link gekopieerd')}catch(e){prompt('Kopieer deze link:',url)}
+}
+function checkImport(){
+  const m=location.hash.match(/^#deel=([\w-]+)/);if(!m)return;
+  history.replaceState(null,'',location.pathname+location.search);
+  try{
+    const d=JSON.parse(b64d(m[1])),r={id:'u'+Date.now(),type:d.t==='hunt'?'hunt':'route',name:String(d.n).slice(0,60),color:/^#[0-9a-f]{6}$/i.test(d.c)?d.c:COLORS[0],pts:decPoly(d.p)};
+    if(d.k)r.cps=d.k.map(c=>({e:c[0],n:c[1],h:c[2],t:c[3]}));
+    if(r.pts.length<2&&r.type==='route')throw 0;
+    r.len=pathLen(r.pts);
+    modal(`${thumb(r)}<h2>${r.type==='hunt'?'Speurtocht':'Route'} ontvangen</h2><p class="desc">“${esc(r.name)}” · ${r.type==='hunt'?r.pts.length+' schatten':fmt(r.len)}</p><button class="pill" id="mOk">Toevoegen</button><button class="pill gray" id="mNo">Niet nu</button>`);
+    $('mOk').onclick=()=>{closeModal();const{len,...plain}=r;routes.push(plain);saveRoutes(routes);routes=getRoutes();setTab(r.type==='hunt'?'hunts':'routes');openDetail(routes.find(x=>x.id===r.id));toast('Toegevoegd')};
+    $('mNo').onclick=closeModal;
+  }catch(e){toast('Deze link werkt niet')}
+}
+
+/* ---------- opslag ---------- */
+function demoRoutes(){return [...clone(DEMO_ROUTES).map((r,i)=>({...r,type:'route',id:'demo-'+(i+1),color:COLORS[i%COLORS.length]})),clone(DEMO_HUNT)]}
+const strip=({len,...r})=>r;
+function getRoutes(){
+  let rs=ls.get(KEY,null);
+  if(!rs)rs=demoRoutes();
+  else if(ls.get(VKEY,1)<3&&!rs.some(r=>r.id===DEMO_HUNT.id))rs.push(clone(DEMO_HUNT)); // nieuw in deze versie
+  rs.forEach((r,i)=>{r.type=r.type||'route';if(!r.id)r.id=r.demo?'demo-'+(i+1):'u'+Date.now()+i;if(!r.color)r.color=COLORS[i%COLORS.length]});
+  ls.set(KEY,rs.map(strip));ls.set(VKEY,VERSION);
+  rs.forEach(r=>r.len=pathLen(r.pts));
+  return rs;
+}
+const saveRoutes=rs=>ls.set(KEY,rs.map(strip));
+const getHistory=()=>ls.get(HKEY,[]);
+
+/* ---------- badges ---------- */
+const BADGES=[
+  {e:'🥾',n:'Eerste stappen',d:'Je eerste wandeling',ok:h=>h.length>=1},
+  {e:'🌲',n:'Boswandelaar',d:'5 wandelingen',ok:h=>h.length>=5},
+  {e:'🏅',n:'10 kilometer',d:'In totaal 10 km',ok:h=>h.reduce((s,x)=>s+x.meters,0)>=10000},
+  {e:'🗺️',n:'Ontdekker',d:'Alle routes gelopen',ok:h=>{const rs=routes.filter(r=>r.type==='route');return rs.length>0&&rs.every(r=>h.some(x=>x.id===r.id))}},
+  {e:'🔍',n:'Speurneus',d:'Speurtocht voltooid',ok:h=>h.some(x=>x.type==='hunt')},
+  {e:'↩️',n:'Andersom',d:'Route andersom gelopen',ok:h=>h.some(x=>x.rev)},
+  {e:'🌅',n:'Vroege vogel',d:'Gestart vóór 8:00',ok:h=>h.some(x=>new Date(x.at-x.secs*1000).getHours()<8)},
+  {e:'🦉',n:'Nachtuil',d:'Na 20:00 gewandeld',ok:h=>h.some(x=>new Date(x.at).getHours()>=20)},
+  {e:'☔',n:'Weer of geen weer',d:'Gewandeld in de regen',ok:h=>h.some(x=>x.rain)},
+];
+const earned=h=>BADGES.filter(b=>b.ok(h)).map(b=>b.n);
+
+/* ---------- kaart ---------- */
+const map=L.map('map',{zoomControl:false,attributionControl:false}).setView(CENTER,15);
+L.control.attribution({position:'topleft',prefix:false}).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+// Eigen kaart van het bos die onder de tegels ligt: zonder bereik zie je dan toch de paden
+map.createPane('offline').style.zIndex=150;
+L.polygon(decPoly(OFFLINE.b),{pane:'offline',className:'off-forest',interactive:false}).addTo(map);
+OFFLINE.m.forEach(e=>L.polyline(decPoly(e),{pane:'offline',className:'off-road',interactive:false}).addTo(map));
+OFFLINE.p.forEach(e=>L.polyline(decPoly(e),{pane:'offline',className:'off-path',interactive:false}).addTo(map));
+function setOnline(){$('offline').classList.toggle('hide',navigator.onLine)}
+addEventListener('online',setOnline);addEventListener('offline',setOnline);
+const routeLayer=L.layerGroup().addTo(map),draftLayer=L.layerGroup().addTo(map);
+let routes=getRoutes(),selected=null,detailRev=false,animatedId=null,me=null,meMarker=null,heading=null,fakePos=false;
+const icon=(html,size)=>L.divIcon({className:'',html,iconSize:[size,size]});
+const canOpen=()=>view!=='make'&&!F.route;
+
+function chevrons(pts){
+  let acc=0;
+  for(let i=1;i<pts.length;i++){
+    acc+=dist(pts[i-1],pts[i]);
+    if(acc<80)continue;acc=0;
+    const m=[(pts[i-1][0]+pts[i][0])/2,(pts[i-1][1]+pts[i][1])/2];
+    L.marker(m,{icon:icon(`<div class="chevm" style="transform:rotate(${bearing(pts[i-1],pts[i])}deg)"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 9.5 7 5.5l4 4" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`,14),interactive:false}).addTo(routeLayer);
+  }
+}
+function huntPins(r,op){
+  L.polyline(r.pts,{color:r.color,weight:3,opacity:op*.8,dashArray:'1 9',lineCap:'round',interactive:false}).addTo(routeLayer);
+  r.pts.forEach((p,i)=>L.marker(p,{icon:L.divIcon({className:'',html:`<div class="pin" style="background:${r.color};opacity:${op}"><i>${i+1}</i></div>`,iconSize:[26,26],iconAnchor:[13,30]})}).on('click',()=>{if(canOpen())openDetail(r)}).addTo(routeLayer));
+}
+function drawRoutes(){
+  routeLayer.clearLayers();
+  let vis;
+  if(view==='make'||view==='log')vis=routes;
+  else if(view==='detail'&&selected)vis=routes.filter(r=>r.type===selected.type);
+  else vis=tab==='hunts'?routes.filter(r=>r.type==='hunt'):filtered();
+  const faded=view==='make'||view==='log';
+  vis.forEach(r=>{
+    const isSel=selected&&selected.id===r.id,op=faded?.3:selected&&!isSel?.2:1;
+    if(r.type==='hunt'){
+      if(faded||(selected&&!isSel))L.polyline(r.pts,{color:r.color,weight:3,opacity:op,dashArray:'1 9',lineCap:'round',interactive:false}).addTo(routeLayer);
+      else huntPins(r,op);
+      return;
+    }
+    const pts=isSel&&detailRev?[...r.pts].reverse():r.pts,animate=isSel&&animatedId!==r.id+detailRev;
+    const casing=L.polyline(pts,{color:'#fff',weight:9,opacity:op*.9,interactive:false,className:animate?'draw':''}).addTo(routeLayer);
+    const line=L.polyline(pts,{color:r.color,weight:5,opacity:op,className:animate?'draw':''}).addTo(routeLayer);
+    if(animate){animatedId=r.id+detailRev;[casing,line].forEach(l=>l.getElement()&&l.getElement().setAttribute('pathLength','1'))}
+    line.on('click',e=>{L.DomEvent.stop(e);if(canOpen())openDetail(r)});
+    if(!selected&&!faded)L.marker(r.pts[0],{icon:icon(`<div class="sdot" style="background:${r.color}"></div>`,14),interactive:false}).addTo(routeLayer);
+    if(isSel){
+      chevrons(pts);
+      L.marker(pts[0],{icon:icon(`<div class="flag" style="background:${r.color}">${ICON.play.replace('width="15" height="15"','width="11" height="11"')}</div>`,28),interactive:false}).addTo(routeLayer);
+    }
+  });
+}
+function fitWithSheet(bounds){map.fitBounds(bounds,{paddingTopLeft:[24,70],paddingBottomRight:[24,sheetVisible()+24],maxZoom:17})}
+const boundsOf=rs=>rs.length?L.latLngBounds(rs.flatMap(r=>r.pts)):L.latLngBounds(FOREST);
+
+/* ---------- locatie & kompas ---------- */
+let watchId=null,lastListRender=0;
+function startGPS(){
+  if(watchId!==null||!navigator.geolocation)return;
+  watchId=navigator.geolocation.watchPosition(p=>{if(!fakePos)setMe([p.coords.latitude,p.coords.longitude])},
+    ()=>{if(F.route&&!me)$('dir').textContent='Zet locatie aan'},{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+}
+function setMe(ll){
+  me=ll;
+  if(!meMarker)meMarker=L.marker(ll,{icon:icon('<div class="me"></div>',22),interactive:false,zIndexOffset:1000}).addTo(map);
+  else meMarker.setLatLng(ll);
+  if(F.route)return onMove();
+  if(Date.now()-lastListRender>15000){if(view==='list')renderList();else if(view==='detail')renderDetail()}
+}
+let compassOn=false;
+async function startCompass(){
+  if(compassOn)return;
+  try{if(window.DeviceOrientationEvent&&typeof DeviceOrientationEvent.requestPermission==='function'){if(await DeviceOrientationEvent.requestPermission()!=='granted')return}}catch(e){return}
+  compassOn=true;
+  const h=e=>{
+    const v=e.webkitCompassHeading!=null?e.webkitCompassHeading:(e.absolute&&e.alpha!=null?(360-e.alpha)%360:null);
+    if(v!=null&&!F.sim){heading=v;if(F.route)render()}
+  };
+  addEventListener('deviceorientationabsolute',h,true);addEventListener('deviceorientation',h,true);
+}
+$('locBtn').onclick=()=>{startGPS();if(me)map.flyTo(me,17,{duration:.6});else{toast('Locatie zoeken…');fitWithSheet(FOREST)}};
+$('forestBtn').onclick=()=>fitWithSheet(FOREST);
+
+/* ---------- weer (Open-Meteo, geen sleutel nodig) ---------- */
+let W=null;
+const WX={0:['☀️','Helder'],1:['🌤️','Licht bewolkt'],2:['⛅','Half bewolkt'],3:['☁️','Bewolkt'],45:['🌫️','Mist'],48:['🌫️','Mist'],51:['🌦️','Motregen'],53:['🌦️','Motregen'],55:['🌦️','Motregen'],56:['🌧️','IJzel'],57:['🌧️','IJzel'],61:['🌧️','Lichte regen'],63:['🌧️','Regen'],65:['🌧️','Zware regen'],66:['🌧️','IJzel'],67:['🌧️','IJzel'],71:['🌨️','Sneeuw'],73:['🌨️','Sneeuw'],75:['🌨️','Sneeuw'],77:['🌨️','Sneeuw'],80:['🌦️','Buien'],81:['🌦️','Buien'],82:['⛈️','Zware buien'],85:['🌨️','Sneeuwbuien'],86:['🌨️','Sneeuwbuien'],95:['⛈️','Onweer'],96:['⛈️','Onweer'],99:['⛈️','Onweer']};
+async function loadWeather(){
+  try{
+    const j=await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=52.231&longitude=5.149&current=temperature_2m,weather_code,precipitation,is_day&hourly=precipitation_probability&daily=sunrise,sunset&timezone=Europe%2FAmsterdam&forecast_days=2')).json();
+    const now=Date.now(),hrs=j.hourly.time.map(t=>new Date(t).getTime());
+    let rainAt=null;
+    for(let i=0;i<hrs.length;i++){if(hrs[i]+3600e3<=now)continue;if(hrs[i]>now+3*3600e3)break;if(j.hourly.precipitation_probability[i]>=50){rainAt=Math.max(hrs[i],now);break}}
+    const sets=j.daily.sunset.map(t=>new Date(t).getTime()),rises=j.daily.sunrise.map(t=>new Date(t).getTime());
+    W={temp:Math.round(j.current.temperature_2m),code:j.current.weather_code,precip:j.current.precipitation,day:!!j.current.is_day,
+       sunset:sets[0],sunrise:rises.find(t=>t>now)||rises[0],rainAt};
+  }catch(e){W={error:true}}
+  if(view==='list'&&tab==='routes')renderList();else if(view==='detail')renderDetail();
+}
+function weatherHTML(){
+  if(!W)return '<div class="wx load">Weer laden…</div>';
+  if(W.error)return '';
+  const [em,txt]=WX[W.code]||['🌡️',''],night=!W.day,now=Date.now();
+  const e=night&&W.code<=2?'🌙':em;
+  const rain=W.precip>0?'Het regent nu, jas aan!':W.rainAt?`Kans op regen rond ${hhmm(W.rainAt)}`:'Droog de komende uren';
+  const sun=now<W.sunset?['Zon onder',hhmm(W.sunset)]:['Zon op',hhmm(W.sunrise)];
+  return `<div class="wx"><div class="i">${e}</div><div class="t"><b>${W.temp}° · ${txt}</b><span>${rain}</span></div><div class="s"><span>${sun[0]}</span><b>${sun[1]}</b></div></div>`;
+}
+function warnings(r){
+  if(!W||W.error)return '';
+  const now=Date.now(),end=now+minutes(r.len)*60e3,out=[];
+  if(now>W.sunset)out.push(['🌙','Het is al donker. Neem een lampje mee en blijf op de paden.']);
+  else if(end>W.sunset-15*60e3)out.push(['🌇',`De zon gaat om ${hhmm(W.sunset)} onder. ${end>W.sunset?'Je bent dan nog onderweg.':'Je bent dan net klaar.'}`]);
+  if(W.precip>0)out.push(['🌧️','Het regent op dit moment.']);
+  else if(W.rainAt&&W.rainAt<end)out.push(['🌦️',`Kans op regen rond ${hhmm(W.rainAt)}, voordat je klaar bent.`]);
+  return out.map(([e,t])=>`<div class="warn"><span>${e}</span><span>${t}</span></div>`).join('');
+}
+
+/* ---------- bottom sheet ---------- */
+const sheet=$('sheet'),tabbar=$('tabbar');let snap='half',suppressClick=0;
+const tabH=()=>tabbar.classList.contains('hide')?0:tabbar.offsetHeight;
+function snaps(){const H=sheet.offsetHeight,t=tabH();return{full:0,half:Math.max(0,H-Math.round(innerHeight*.5)-t*.3),low:Math.max(0,H-(view==='make'?350:200)-t)}}
+function setSnap(s){snap=s;sheet.style.transform=`translateY(${snaps()[s]}px)`}
+const sheetVisible=()=>sheet.classList.contains('hide')?0:sheet.offsetHeight-snaps()[snap];
+let drag=null;
+sheet.addEventListener('pointerdown',e=>{
+  if(!e.target.closest('[data-drag]'))return;
+  drag={id:e.pointerId,y:e.clientY,start:snaps()[snap],cur:snaps()[snap],moved:false,lastY:e.clientY,lastT:e.timeStamp,v:0,onGrab:!!e.target.closest('.grab')};
+});
+addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  const dy=e.clientY-drag.y;
+  if(!drag.moved){if(Math.abs(dy)<6)return;drag.moved=true;sheet.classList.add('drag')}
+  const s=snaps(),y=Math.min(s.low+50,Math.max(-16,drag.start+dy));
+  drag.v=(e.clientY-drag.lastY)/Math.max(1,e.timeStamp-drag.lastT);drag.lastY=e.clientY;drag.lastT=e.timeStamp;drag.cur=y;
+  sheet.style.transform=`translateY(${y}px)`;
+});
+function endDrag(){
+  if(!drag)return;const d=drag;drag=null;
+  if(!d.moved){if(d.onGrab)setSnap(snap==='full'?'half':'full');return}
+  sheet.classList.remove('drag');suppressClick=Date.now()+350;
+  const s=snaps(),proj=d.cur+d.v*220;let best=snap,bd=1e9;
+  for(const k in s){const dd=Math.abs(s[k]-proj);if(dd<bd){bd=dd;best=k}}
+  setSnap(best);
+}
+addEventListener('pointerup',endDrag);addEventListener('pointercancel',endDrag);
+sheet.addEventListener('click',e=>{if(Date.now()<suppressClick){e.stopPropagation();e.preventDefault()}},true);
+addEventListener('resize',()=>{setTabH();setSnap(snap)});
+function setTabH(){document.documentElement.style.setProperty('--tabh',tabH()+'px')}
+
+/* ---------- toast & modal ---------- */
+let toastT;
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2200)}
+function modal(html){$('mcard').innerHTML=html;$('modal').classList.remove('hide')}
+function closeModal(){$('modal').classList.add('hide')}
+$('modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+
+/* ---------- tabs & views ---------- */
+let view='list',tab='routes',filter='all';
+function showView(v){
+  view=v;
+  ['List','Log','Detail','Make'].forEach(k=>$('v'+k).classList.toggle('hide',k.toLowerCase()!==v));
+  tabbar.classList.toggle('hide',v==='make');setTabH();
+  drawRoutes();
+}
+function setTab(t){
+  tab=t;selected=null;
+  tabbar.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  if(t==='log'){showView('log');renderLog();fitWithSheet(FOREST)}
+  else{showView('list');renderList();fitWithSheet(boundsOf(t==='hunts'?routes.filter(r=>r.type==='hunt'):filtered()))}
+  $(t==='log'?'vLog':'vList').scrollTop=0;
+}
+tabbar.onclick=e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.tab)};
+const filtered=()=>routes.filter(r=>r.type==='route'&&(filter==='all'||level(r.len)===filter));
+
+function thumb(r,size=48){
+  const k=Math.cos(rad(52.23)),xs=r.pts.map(p=>p[1]*k),ys=r.pts.map(p=>-p[0]);
+  const x0=Math.min(...xs),y0=Math.min(...ys),w=Math.max(...xs)-x0,h=Math.max(...ys)-y0,s=32/Math.max(w,h,1e-9);
+  const P=i=>[((xs[i]-x0)*s+(48-w*s)/2).toFixed(1),((ys[i]-y0)*s+(48-h*s)/2).toFixed(1)];
+  const d=r.pts.map((p,i)=>(i?'L':'M')+P(i).join(' ')).join('');
+  const hunt=r.type==='hunt';
+  const extra=hunt?r.pts.map((p,i)=>`<circle cx="${P(i)[0]}" cy="${P(i)[1]}" r="3.2" fill="${r.color}"/>`).join(''):'';
+  return `<div class="thumb" style="background:${r.color}26;width:${size}px;height:${size}px;border-radius:${size*.23}px"><svg width="${size}" height="${size}" viewBox="0 0 48 48"><path d="${d}" fill="none" stroke="${r.color}" stroke-width="${hunt?2:3}" ${hunt?'stroke-dasharray="1 4"':''} stroke-linejoin="round" stroke-linecap="round"/>${extra}</svg></div>`;
+}
+function badge(r){
+  if(r.type==='hunt')return `<span class="badge" style="color:#ff9f0a;background:#ff9f0a24">Speurtocht</span>`;
+  const L_=LEVELS[level(r.len)];return `<span class="badge" style="color:${L_.c};background:${L_.c}24">${L_.l}</span>`;
+}
+function cellHTML(r,h){
+  const n=h.filter(x=>x.id===r.id).length,hunt=r.type==='hunt';
+  return `<button class="cell" data-id="${esc(r.id)}">${thumb(r)}<div class="t"><b>${esc(r.name)}</b><div class="m">${hunt?`${r.pts.length} schatten · ${fmt(r.len)}`:`${fmt(r.len)} · ${minutes(r.len)} min`} ${badge(r)}</div>${me?`<div class="m">${fmt(dist(me,r.pts[0]))} hiervandaan</div>`:''}</div>${n?`<span class="done">✓ ${n}×</span>`:''}<span class="chev">${ICON.chev}</span></button>`;
+}
+
+function renderList(){
+  lastListRender=Date.now();
+  const hunt=tab==='hunts',h=getHistory(),rs=hunt?routes.filter(r=>r.type==='hunt'):filtered();
+  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  const tip=isIOS&&!standalone&&!ls.get(TIPKEY,false)?`<div class="tip"><img src="icon-180.png" alt=""><div style="flex:1"><b>Zet op je beginscherm</b>Tik op <span style="color:var(--blue)">${ICON.share.replace('width="19" height="22"','width="12" height="15"')}</span> en kies <b style="display:inline">Zet op beginscherm</b> voor de echte app-ervaring.</div><button class="circ" id="tipX">${ICON.x}</button></div>`:'';
+  $('vList').innerHTML=`
+    <div class="hd" data-drag><h1>${hunt?'Speurtocht':'Routes'}</h1><button class="circ blue" id="addBtn" aria-label="Nieuw">${ICON.plus}</button></div>
+    ${hunt?'<p class="lead">Volg de pijl naar verstopte plekken in het bos. Bij elke schat krijg je een weetje of opdracht. Leuk met kinderen!</p>':weatherHTML()}
+    ${tip}
+    ${hunt?'':`<div class="seg" id="seg">${Object.entries({all:'Alle',kort:'Kort',middel:'Middel',lang:'Lang'}).map(([k,v])=>`<button data-f="${k}" class="${k===filter?'on':''}">${v}</button>`).join('')}</div>`}
+    <div class="group">${rs.length?rs.map(r=>cellHTML(r,h)).join(''):`<div class="cell" style="color:var(--dim);justify-content:center;padding:22px">${hunt?'Nog geen speurtochten':'Geen routes in deze categorie'}</div>`}</div>
+    ${hunt?`<button class="pill gray" id="addBtn2" style="margin-top:14px">${ICON.plus} Verstop zelf schatten</button>`:''}
+    <button class="link" id="resetBtn">Voorbeelden terugzetten</button>`;
+  $('vList').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openDetail(routes.find(r=>r.id===b.dataset.id)));
+  $('addBtn').onclick=startMake;if($('addBtn2'))$('addBtn2').onclick=startMake;
+  if($('tipX'))$('tipX').onclick=()=>{ls.set(TIPKEY,true);renderList()};
+  if($('seg'))$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;filter=b.dataset.f;renderList();drawRoutes();fitWithSheet(boundsOf(filtered()))};
+  $('resetBtn').onclick=()=>{routes=[...demoRoutes(),...routes.filter(r=>!String(r.id).startsWith('demo-'))];saveRoutes(routes);routes=getRoutes();renderList();drawRoutes();toast('Voorbeelden teruggezet')};
+}
+
+function openDetail(r){
+  if(!r)return;
+  if(r.type==='hunt'&&tab!=='hunts'||r.type==='route'&&tab!=='routes'){tab=r.type==='hunt'?'hunts':'routes';tabbar.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab))}
+  selected=r;detailRev=false;animatedId=null;showView('detail');renderDetail();$('vDetail').scrollTop=0;
+  if(snap==='full')setSnap('half');fitWithSheet(L.latLngBounds(r.pts));
+}
+function renderDetail(){
+  const r=selected;if(!r)return;lastListRender=Date.now();
+  const hunt=r.type==='hunt',h=getHistory().filter(x=>x.id===r.id),best=h.length?Math.min(...h.map(x=>x.secs)):null;
+  const start=detailRev?r.pts[r.pts.length-1]:r.pts[0];
+  $('vDetail').innerHTML=`
+    <div class="hd" data-drag><button class="back" id="backBtn">${ICON.back}${hunt?'Speurtocht':'Routes'}</button><button class="circ" id="closeDetail" aria-label="Sluiten">${ICON.x}</button></div>
+    <div style="display:flex;align-items:center;gap:14px">${thumb(r,60)}<div style="min-width:0"><h1 style="font-size:26px;font-weight:700;line-height:1.15">${esc(r.name)}</h1><div style="margin-top:5px">${badge(r)}</div></div></div>
+    <div class="tiles">
+      ${hunt?`<div class="tile"><span>Schatten</span><b>${r.pts.length}</b></div>`:`<div class="tile"><span>Afstand</span><b>${unit(fmt(r.len))}</b></div>`}
+      <div class="tile"><span>Duur</span><b>${hunt?'~':''}${minutes(r.len*(hunt?1.3:1))}<small>min</small></b></div>
+      <div class="tile"><span>${best?'Record':'Van jou'}</span><b>${best?fmtTime(best):me?unit(fmt(dist(me,start))):'–'}</b></div>
+    </div>
+    ${warnings(r)}
+    <p class="desc">${hunt?'Volg de pijl van schat naar schat. Hoe dichterbij, hoe warmer! Bij elke plek krijg je een weetje of een opdracht.':isLoop(r)?`Rondje van ${fmt(r.len)} over de paden van het Corversbos. De pijltjes op de kaart laten de looprichting zien.`:`Route van ${fmt(r.len)} door het Corversbos.`}${h.length?` Je hebt ${hunt?'deze speurtocht':'deze route'} ${h.length}× gedaan.`:''}</p>
+    ${hunt?'':`<div class="seg" id="dirSeg"><button data-r="0" class="${detailRev?'':'on'}">↻ Normaal</button><button data-r="1" class="${detailRev?'on':''}">↺ Andersom</button></div>`}
+    <div class="row" style="margin-top:0"><button class="pill" id="goBtn">${ICON.play}${hunt?'Start speurtocht':'Start route'}</button><button class="sq" id="shareBtn" aria-label="Deel">${ICON.share}</button></div>
+    <button class="link" id="delBtn" style="color:var(--red)">Verwijder ${hunt?'speurtocht':'route'}</button>`;
+  $('goBtn').onclick=()=>startFollow(r,detailRev);
+  $('shareBtn').onclick=()=>shareRoute(r);
+  if($('dirSeg'))$('dirSeg').onclick=e=>{const b=e.target.closest('button');if(!b||(b.dataset.r==='1')===detailRev)return;detailRev=b.dataset.r==='1';renderDetail();drawRoutes()};
+  $('delBtn').onclick=()=>{if(!confirm(`“${r.name}” verwijderen?`))return;routes=routes.filter(x=>x.id!==r.id);saveRoutes(routes);closeDetail();toast('Verwijderd')};
+  $('backBtn').onclick=closeDetail;$('closeDetail').onclick=closeDetail;
+}
+function closeDetail(){selected=null;setTab(tab)}
+
+function renderLog(){
+  const h=getHistory(),got=earned(h),m=h.reduce((s,x)=>s+x.meters,0),secs=h.reduce((s,x)=>s+x.secs,0);
+  const items=[...h].reverse().slice(0,40).map(x=>{
+    const r=routes.find(y=>y.id===x.id)||{name:x.name,pts:x.track&&x.track.length>1?x.track:[[0,0],[0,1]],color:'#8e8e93',type:x.type};
+    const d=new Date(x.at).toLocaleDateString('nl-NL',{weekday:'short',day:'numeric',month:'short'});
+    return `<div class="cell">${thumb(r,44)}<div class="t"><b>${esc(x.name||r.name)}</b><div class="m">${d} · ${hhmm(x.at)}${x.sim?' · simulatie':''}</div></div><div style="text-align:right;flex:none"><b style="font-variant-numeric:tabular-nums">${fmtTime(x.secs)}</b><div class="m" style="justify-content:flex-end">${fmt(x.meters)}</div></div></div>`;
+  }).join('');
+  $('vLog').innerHTML=`
+    <div class="hd" data-drag><h1>Logboek</h1></div>
+    <div class="tiles" style="margin-top:4px">
+      <div class="tile"><span>Wandelingen</span><b>${h.length}</b></div>
+      <div class="tile"><span>Afstand</span><b>${unit(fmt(m))}</b></div>
+      <div class="tile"><span>Tijd</span><b>${fmtDur(secs)}</b></div>
+    </div>
+    <div class="sect">Badges · ${got.length} van ${BADGES.length}</div>
+    <div class="badges">${BADGES.map(b=>`<button class="bdg ${got.includes(b.n)?'':'locked'}" data-d="${esc(b.d)}"><div class="e">${b.e}</div><b>${b.n}</b><span>${b.d}</span></button>`).join('')}</div>
+    <div class="sect">Geschiedenis</div>
+    <div class="group">${items||'<div class="cell" style="color:var(--dim);justify-content:center;padding:22px">Nog niets gelopen. Kies een route!</div>'}</div>
+    ${h.length?'<button class="link" id="clearLog">Logboek wissen</button>':''}`;
+  $('vLog').querySelectorAll('.bdg').forEach(b=>b.onclick=()=>toast((b.classList.contains('locked')?'🔒 ':'🎉 ')+b.dataset.d));
+  if($('clearLog'))$('clearLog').onclick=()=>{if(confirm('Hele logboek wissen?')){ls.set(HKEY,[]);renderLog()}};
+}
+
+/* ---------- route of speurtocht maken ---------- */
+let draft=[],draftCps=[],makeType='route',recording=false,recTimer=null;
+function startMake(){
+  makeType=tab==='hunts'?'hunt':'route';selected=null;draft=[];draftCps=[];$('name').value='';
+  $('makeTitle').textContent=makeType==='hunt'?'Nieuwe speurtocht':'Nieuwe route';
+  $('makeLead').textContent=makeType==='hunt'?'Tik op de kaart om een schat te verstoppen, of sta op de plek en tik op “Verstop hier”.':'Tik op de kaart om punten te zetten, of neem de route op terwijl je hem loopt.';
+  $('name').placeholder=makeType==='hunt'?'Naam van de speurtocht':'Naam van de route';
+  $('recBtn').textContent=makeType==='hunt'?'Verstop hier':'Opnemen';
+  showView('make');redrawDraft();setSnap('low');fitWithSheet(FOREST);
+}
+function addHuntPoint(p){
+  const name=prompt('Wat is hier te vinden?',`Schat ${draft.length+1}`);if(name===null)return;
+  const n=name.trim()||`Schat ${draft.length+1}`;
+  draft.push(p);draftCps.push({e:HUNT_EMOJI[draftCps.length%HUNT_EMOJI.length],n,h:'',t:`Je hebt “${n}” gevonden!`});redrawDraft();
+}
+function redrawDraft(){
+  draftLayer.clearLayers();
+  const hunt=makeType==='hunt';
+  if(draft.length){
+    if(hunt){
+      L.polyline(draft,{color:'#ff9f0a',weight:3,dashArray:'1 9',lineCap:'round'}).addTo(draftLayer);
+      draft.forEach((p,i)=>L.marker(p,{icon:L.divIcon({className:'',html:`<div class="pin" style="background:#ff9f0a"><i>${i+1}</i></div>`,iconSize:[26,26],iconAnchor:[13,30]}),interactive:false}).addTo(draftLayer));
+    }else{
+      L.polyline(draft,{color:'#fff',weight:9,opacity:.9}).addTo(draftLayer);
+      L.polyline(draft,{color:'#ff9f0a',weight:5}).addTo(draftLayer);
+      draft.forEach(p=>L.marker(p,{icon:icon('<div class="dot"></div>',12),interactive:false}).addTo(draftLayer));
+    }
+  }
+  $('makeInfo').textContent=hunt?`${draft.length} ${draft.length===1?'schat':'schatten'} verstopt`:`${draft.length} ${draft.length===1?'punt':'punten'} · ${fmt(pathLen(draft))}`;
+}
+$('cancelMake').onclick=()=>{stopRec();draft=[];draftCps=[];redrawDraft();setTab(tab);setSnap('half')};
+$('undoBtn').onclick=()=>{draft.pop();draftCps.pop();redrawDraft()};
+map.on('click',e=>{
+  if(view!=='make'||recording)return;
+  const p=[+e.latlng.lat.toFixed(6),+e.latlng.lng.toFixed(6)];
+  if(makeType==='hunt')addHuntPoint(p);else{draft.push(p);redrawDraft()}
+});
+function stopRec(){recording=false;clearInterval(recTimer);$('recBtn').textContent=makeType==='hunt'?'Verstop hier':'Opnemen';$('recBtn').classList.remove('rec')}
+$('recBtn').onclick=()=>{
+  startGPS();
+  if(makeType==='hunt'){if(!me)return toast('Locatie zoeken…');addHuntPoint([+me[0].toFixed(6),+me[1].toFixed(6)]);map.panTo(me);return}
+  if(recording)return stopRec();
+  recording=true;$('recBtn').textContent='Stop';$('recBtn').classList.add('rec');
+  recTimer=setInterval(()=>{if(me&&(!draft.length||dist(draft[draft.length-1],me)>=8)){draft.push([+me[0].toFixed(6),+me[1].toFixed(6)]);redrawDraft();map.panTo(me)}},2000);
+};
+$('saveBtn').onclick=()=>{
+  const hunt=makeType==='hunt';
+  if(draft.length<(hunt?1:2))return toast(hunt?'Verstop minstens 1 schat':'Zet minstens 2 punten');
+  stopRec();
+  const own=routes.filter(x=>x.type===makeType&&!String(x.id).startsWith('demo-')).length+1;
+  const r={id:'u'+Date.now(),type:makeType,name:$('name').value.trim()||(hunt?'Mijn speurtocht ':'Mijn route ')+own,color:hunt?'#ff9f0a':COLORS[routes.length%COLORS.length],pts:draft};
+  if(hunt)r.cps=draftCps;
+  routes.push(r);saveRoutes(routes);routes=getRoutes();draft=[];draftCps=[];redrawDraft();
+  setTab(tab);openDetail(routes.find(x=>x.id===r.id));toast('Bewaard');
+};
+
+/* ---------- navigeren (Zoek mijn-stijl) ---------- */
+const F={route:null,base:null,hunt:false,rev:false,phase:'start',idx:0,t0:0,walked:0,last:null,track:[],spoken:{},sound:ls.get(SKEY,true),wake:null,done:false,paused:false,sim:null,simUsed:false,d:null,rel:0,aligned:false,arrowRot:null};
+const SND_ON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const SND_OFF='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9h4l5-4v14l-5-4H3z"/><path d="m16 9 6 6m0-6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const TURN_L='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-7a4 4 0 0 0-4-4H5M9 5 5 9l4 4"/></svg>';
+const TURN_R='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20v-7a4 4 0 0 1 4-4h8M15 5l4 4-4 4"/></svg>';
+$('soundBtn').innerHTML=F.sound?SND_ON:SND_OFF;
+$('soundBtn').onclick=()=>{F.sound=!F.sound;ls.set(SKEY,F.sound);$('soundBtn').innerHTML=F.sound?SND_ON:SND_OFF;if(!F.sound)try{speechSynthesis.cancel()}catch(e){}};
+
+function say(t){if(!F.sound||!('speechSynthesis'in window))return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='nl-NL';u.rate=1.05;speechSynthesis.speak(u)}catch(e){}}
+const buzz=p=>{try{navigator.userActivation&&navigator.userActivation.hasBeenActive&&navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+async function keepAwake(on){
+  try{if(on&&'wakeLock'in navigator&&!F.wake){F.wake=await navigator.wakeLock.request('screen');F.wake.addEventListener('release',()=>F.wake=null)}
+      else if(!on&&F.wake){await F.wake.release();F.wake=null}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&F.route&&!F.done)keepAwake(true)});
+
+function startFollow(base,rev=false){
+  const r=rev?{...base,pts:[...base.pts].reverse()}:base,hunt=r.type==='hunt';
+  Object.assign(F,{route:r,base,rev,hunt,phase:hunt?'route':'start',idx:0,t0:Date.now(),walked:0,last:null,track:[],spoken:{},done:false,paused:false,simUsed:false,d:null,rel:0,arrowRot:null});
+  stopSim();
+  $('finish').classList.add('hide');$('found').classList.add('hide');$('fname').textContent=r.name;
+  $('follow').classList.remove('hide','al','off','hot');
+  startGPS();startCompass();keepAwake(true);
+  say(hunt?`${r.name}. Volg de pijl naar de eerste schat.`:`${r.name}. Loop naar het startpunt.`);
+  if(me)onMove();else render();
+  startDots();
+}
+function nextTurn(){
+  const p=F.route.pts;let acc=dist(me,p[F.idx]);
+  for(let j=F.idx;j<p.length-1&&acc<220;j++){
+    if(j>=1){const a=turnAngle(bearing(p[j-1],p[j]),bearing(p[j],p[j+1]));if(Math.abs(a)>40)return{j,d:acc,a}}
+    acc+=dist(p[j],p[j+1]);
+  }
+  return null;
+}
+const turnWord=a=>(Math.abs(a)>115?'scherp ':'')+(a<0?'linksaf':'rechtsaf');
+const heat=d=>d<30?['🔥','Heet! Kijk goed om je heen']:d<70?['♨️','Warm']:d<150?['🌤️','Lauw']:['❄️','Koud'];
+function onMove(){
+  if(!F.route||F.done||F.paused)return;
+  const p=F.route.pts,last=p.length-1;
+  if(F.last){const s=dist(F.last,me);if(s>3){if(F.phase==='route'&&s<80){F.walked+=s;F.track.push([+me[0].toFixed(5),+me[1].toFixed(5)])}F.last=[...me]}}else F.last=[...me];
+  if(F.hunt){if(dist(me,p[F.idx])<HUNT_RADIUS)return showFound();return render()}
+  if(F.phase==='start'&&dist(me,p[0])<START_RADIUS){
+    Object.assign(F,{phase:'route',idx:1,t0:Date.now(),walked:0,track:[[...p[0]]]});
+    buzz([40,60,40]);say('Je bent bij het startpunt. Volg de pijl.');
+  }
+  if(F.phase==='route'){
+    for(let j=Math.min(last,F.idx+4);j>F.idx;j--)if(dist(me,p[j])<ARRIVE){F.idx=j;break} // bocht afgesneden
+    while(F.idx<last&&dist(me,p[F.idx])<ARRIVE){F.idx++;buzz(25)}
+    if(F.idx===last&&dist(me,p[last])<ARRIVE)return finish();
+    const t=nextTurn();
+    if(t&&t.d<40&&!F.spoken[t.j]){F.spoken[t.j]=1;say(`Zo meteen ${turnWord(t.a)}`);buzz([30,50,30])}
+  }
+  render();
+}
+function showFound(){
+  F.paused=true;
+  const p=F.route.pts,c=(F.route.cps||[])[F.idx]||{e:'⭐',n:`Schat ${F.idx+1}`,t:'Gevonden!'},lastOne=F.idx===p.length-1;
+  $('foundEmoji').textContent=c.e;$('foundStep').textContent=`Schat ${F.idx+1} van ${p.length} gevonden`;
+  $('foundTitle').textContent=c.n;$('foundText').textContent=c.t||'';
+  $('foundNext').textContent=lastOne?'Afronden':'Volgende schat';
+  $('follow').classList.remove('al','hot');$('found').classList.remove('hide');
+  buzz([50,60,50]);say(`Gevonden! ${c.n}. ${c.t||''}`);confetti($('foundConf'),60);
+}
+$('foundNext').onclick=()=>{
+  $('found').classList.add('hide');F.paused=false;
+  if(F.idx===F.route.pts.length-1)return finish();
+  F.idx++;const c=(F.route.cps||[])[F.idx];
+  say(c&&c.h?`Volgende schat. Hint: ${c.h}`:'Op naar de volgende schat!');
+  render();
+};
+function render(){
+  if(!F.route||F.done)return;
+  const p=F.route.pts,last=p.length-1,start=F.phase==='start',target=start?p[0]:p[F.idx];
+  $('fstep').textContent=F.hunt?`Schat ${F.idx+1} van ${p.length}`:start?'Naar het startpunt':`Punt ${F.idx} van ${last}`;
+  if(!me){$('dist').textContent='–';$('dir').textContent='GPS zoeken…';$('next').textContent='';F.d=null;renderStats();return}
+  const d=dist(me,target),b=bearing(me,target),rel=heading==null?b:(b-heading+360)%360,off=Math.min(rel,360-rel);
+  F.d=d;F.rel=rel;
+  const cur=F.arrowRot??rel;F.arrowRot=cur+turnAngle(((cur%360)+360)%360,rel); // kortste kant op draaien
+  $('arrow').style.transform=`rotate(${F.arrowRot}deg)`;
+  const offRoute=!F.hunt&&!start&&Math.min(segDist(me,p[F.idx-1],p[F.idx]),F.idx<last?segDist(me,p[F.idx],p[F.idx+1]):1e9)>OFF_ROUTE;
+  const aligned=heading!=null&&off<20;
+  if(aligned&&!F.aligned)buzz(15);F.aligned=aligned;
+  const hot=F.hunt&&d<30;
+  $('follow').classList.toggle('hot',hot);
+  $('follow').classList.toggle('al',aligned&&!offRoute&&!hot);$('follow').classList.toggle('off',offRoute);
+  $('dist').innerHTML=d>=1000?`${(d/1000).toFixed(1).replace('.',',')}<small>km</small>`:`${Math.round(d)}<small>m</small>`;
+  $('dir').textContent=heading==null?(F.hunt?heat(d)[1].split('!')[0].toLowerCase():'naar het doel'):aligned?'rechtdoor':off>150?'achter je':rel<180?'naar rechts':'naar links';
+  let nx='';
+  if(F.hunt){const c=(F.route.cps||[])[F.idx],[e,t]=heat(d);nx=`${e} ${t}${c&&c.h&&d>=30?` · ${esc(c.h)}`:''}`}
+  else if(offRoute)nx='⚠︎ Je loopt van de route af';
+  else if(start)nx='Daar begint de route';
+  else if(heading==null)nx='Geen kompas: pijl wijst t.o.v. het noorden';
+  else{const t=nextTurn();if(t)nx=(t.a<0?TURN_L:TURN_R)+(t.d<15?`Nu ${turnWord(t.a)}`:`Over ${fmt(Math.round(t.d/5)*5)} ${turnWord(t.a)}`)}
+  $('next').innerHTML=nx;
+  renderStats();
+}
+function remaining(){
+  if(!me||!F.route)return null;const p=F.route.pts;
+  if(F.phase==='start')return F.route.len;
+  return dist(me,p[F.idx])+pathLen(p.slice(F.idx));
+}
+function renderStats(){
+  if(!F.route||F.done)return;
+  const rem=remaining(),p=F.route.pts;
+  $('sTime').textContent=F.phase==='route'?fmtTime((Date.now()-F.t0)/1000):'0:00';
+  $('sWalk').textContent=fmt(F.walked);
+  $('sLeft').textContent=rem==null?'–':fmt(rem);
+  const pct=F.hunt?F.idx/p.length*100:rem==null||F.phase==='start'?0:Math.max(0,Math.min(100,(1-rem/F.route.len)*100));
+  $('ringP').setAttribute('stroke-dasharray',`${pct.toFixed(1)} 100`);
+}
+setInterval(renderStats,1000);
+
+function trackSVG(routePts,track,color){
+  const all=[...routePts,...track],k=Math.cos(rad(52.23)),W_=320,H_=150,pad=16;
+  const xs=all.map(p=>p[1]*k),ys=all.map(p=>-p[0]),x0=Math.min(...xs),y0=Math.min(...ys),w=Math.max(...xs)-x0,h=Math.max(...ys)-y0;
+  const s=Math.min((W_-2*pad)/Math.max(w,1e-9),(H_-2*pad)/Math.max(h,1e-9)),ox=(W_-w*s)/2,oy=(H_-h*s)/2;
+  const path=pts=>pts.map((p,i)=>(i?'L':'M')+((p[1]*k-x0)*s+ox).toFixed(1)+' '+((-p[0]-y0)*s+oy).toFixed(1)).join('');
+  return `<svg viewBox="0 0 ${W_} ${H_}" preserveAspectRatio="xMidYMid meet"><path d="${path(routePts)}" fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>${track.length>1?`<path d="${path(track)}" fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" pathLength="1" class="draw"/>`:''}</svg>`;
+}
+function finish(){
+  F.done=true;stopSim();keepAwake(false);
+  const r=F.route,base=F.base,secs=(Date.now()-F.t0)/1000,m=F.walked>r.len*.5?F.walked:r.len;
+  const step=Math.ceil(F.track.length/250)||1,track=F.track.filter((_,i)=>i%step===0);
+  const h=getHistory(),before=earned(h);
+  h.push({id:base.id,name:base.name,type:base.type,at:Date.now(),secs:Math.round(secs),meters:Math.round(m),track,rev:F.rev||undefined,sim:F.simUsed||undefined,rain:W&&W.precip>0||undefined});
+  ls.set(HKEY,h);
+  const mine=h.filter(x=>x.id===base.id),n=mine.length,best=Math.min(...mine.map(x=>x.secs)),fresh=BADGES.filter(b=>earned(h).includes(b.n)&&!before.includes(b.n));
+  $('follow').classList.remove('al','off','hot');
+  $('finTitle').textContent=F.hunt?'Alle schatten gevonden!':`${r.name} voltooid`;
+  $('finSub').textContent=F.hunt?`${r.name} · ${r.pts.length} schatten`:n===1?'Je eerste keer op deze route!':best>=Math.round(secs)?`Nieuw record! Dit was keer ${n}.`:`Dit was keer ${n} op deze route.`;
+  $('finMap').innerHTML=trackSVG(r.pts,track,r.color);
+  $('finTime').textContent=fmtTime(secs);$('finDist').textContent=fmt(m);
+  const ps=Math.round(secs/(m/1000));$('finPace').innerHTML=`${Math.floor(ps/60)}'${String(ps%60).padStart(2,'0')}"<small style="font-size:12px;opacity:.6"> /km</small>`;
+  $('finBadges').innerHTML=fresh.map((b,i)=>`<div class="nb" style="animation-delay:${.5+i*.15}s"><div class="e">${b.e}</div><div><b>Nieuwe badge: ${b.n}</b><span>${b.d}</span></div></div>`).join('');
+  $('finish').classList.remove('hide');$('finish').scrollTop=0;
+  buzz([60,80,60,80,120]);say(F.hunt?`Gefeliciteerd! Je hebt alle schatten gevonden.`:`Gefeliciteerd! Je hebt de ${r.name} uitgelopen.`);confetti($('confetti'),140);
+}
+function closeFollow(){
+  stopSim();keepAwake(false);try{speechSynthesis.cancel()}catch(e){}
+  F.route=null;F.done=false;F.paused=false;fakePos=false;F.arrowRot=null;
+  $('follow').classList.add('hide');$('mapbar').classList.add('hide');sheet.classList.remove('hide');tabbar.classList.remove('hide');setTabH();
+  routes=getRoutes();
+  if(selected){selected=routes.find(r=>r.id===selected.id)||null}
+  if(selected){showView('detail');renderDetail()}else setTab(tab);
+}
+$('finOk').onclick=closeFollow;
+$('stopBtn').onclick=()=>{if((F.phase==='route'&&F.walked>50||F.hunt&&F.idx>0)&&!confirm('Stoppen?'))return;closeFollow()};
+$('mapBtn').onclick=()=>{
+  $('follow').classList.add('hide');sheet.classList.add('hide');tabbar.classList.add('hide');
+  $('mapbarName').textContent=F.route.name;$('mapbar').classList.remove('hide');
+  selected=F.base;detailRev=F.rev;animatedId=null;view='detail';drawRoutes();
+  map.fitBounds(L.latLngBounds(me?[...F.route.pts,me]:F.route.pts),{paddingTopLeft:[40,60],paddingBottomRight:[40,100],maxZoom:17});
+};
+$('mapbar').onclick=()=>{$('mapbar').classList.add('hide');$('follow').classList.remove('hide');startDots()};
+
+/* simulatie: loopt de route af (ook het stukje naar de start) zodat je thuis kunt testen */
+function stopSim(){clearInterval(F.sim);F.sim=null;$('simBtn').querySelector('span').textContent='Simuleer'}
+$('simBtn').onclick=()=>{
+  if(F.sim){stopSim();return}
+  const p=F.route.pts;let path;
+  if(F.phase==='start'||F.hunt&&F.idx===0){const s=me&&dist(me,p[0])<400?me:[p[0][0]-.0004,p[0][1]-.0006];path=[s,...p]}
+  else path=[me||p[Math.max(0,F.idx-1)],...p.slice(F.idx)];
+  fakePos=true;F.simUsed=true;let i=0,t=0;setMe([...path[0]]);
+  $('simBtn').querySelector('span').textContent='Pauze';
+  F.sim=setInterval(()=>{
+    if(F.paused)return;
+    const a=path[i],b=path[i+1];if(!b)return stopSim();
+    heading=(bearing(a,b)+Math.sin(Date.now()/900)*14+360)%360; // kijk ongeveer in looprichting
+    t+=Math.min(1,6/Math.max(dist(a,b),1));
+    if(t>=1){i++;t=0;return setMe([...b])}
+    setMe([a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]);
+  },400);
+};
+
+/* stippen rond de pijl, trekken samen als je dichterbij komt */
+const cv=$('dots'),cx=cv.getContext('2d');
+const DOTS=Array.from({length:80},()=>({a:Math.random()*Math.PI*2,r:Math.random(),s:.4+Math.random(),ph:Math.random()*7}));
+let dotR=null,dotsRunning=false;
+function startDots(){if(!dotsRunning){dotsRunning=true;requestAnimationFrame(dotsLoop)}}
+function dotsLoop(t){
+  if(!F.route||$('follow').classList.contains('hide')){dotsRunning=false;return}
+  const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr)}
+  cx.setTransform(dpr,0,0,dpr,0,0);cx.clearRect(0,0,w,h);
+  const ringR=$('ring').clientWidth/2||Math.min(w,h)/2,goal=ringR*(F.d==null?.8:.42+.43*Math.min(1,F.d/120));
+  dotR=dotR==null?goal:dotR+(goal-dotR)*.05;
+  const dir=rad(F.arrowRot??0)-Math.PI/2,known=heading!=null&&F.d!=null;
+  for(const p of DOTS){
+    const ang=p.a+t/14000*p.s,rr=dotR*(.8+.28*p.r)+Math.sin(t/800+p.ph)*3;
+    const x=w/2+Math.cos(ang)*rr,y=h/2+Math.sin(ang)*rr;
+    const face=known?Math.max(0,Math.cos(ang-dir))**3:0;
+    const al=.18+.7*face+.12*Math.sin(t/450+p.ph);
+    cx.fillStyle=`rgba(255,255,255,${Math.max(.06,Math.min(1,al))})`;
+    cx.beginPath();cx.arc(x,y,1.3+p.s*1.2+face*1.5,0,Math.PI*2);cx.fill();
+  }
+  requestAnimationFrame(dotsLoop);
+}
+
+function confetti(c,count){
+  const g=c.getContext('2d'),dpr=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+  c.width=w*dpr;c.height=h*dpr;g.setTransform(dpr,0,0,dpr,0,0);
+  const P=Array.from({length:count},()=>({x:w/2+(Math.random()-.5)*60,y:h*.35,vx:(Math.random()-.5)*12,vy:-Math.random()*13-4,r:Math.random()*6.28,vr:(Math.random()-.5)*.3,c:COLORS[Math.random()*COLORS.length|0],s:5+Math.random()*5}));
+  const t0=performance.now();
+  (function f(t){
+    g.clearRect(0,0,w,h);const age=(t-t0)/1000;
+    P.forEach(p=>{p.vy+=.35;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;g.save();g.globalAlpha=Math.max(0,1-age/3.2);g.translate(p.x,p.y);g.rotate(p.r);g.fillStyle=p.c;g.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);g.restore()});
+    if(age<3.3)requestAnimationFrame(f);else g.clearRect(0,0,w,h);
+  })(t0);
+}
+
+/* ---------- start ---------- */
+setTabH();setTab('routes');setSnap('half');
+setOnline();startGPS();loadWeather();checkImport();
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
