@@ -46,7 +46,7 @@ input{font:inherit;-webkit-user-select:text;user-select:text}
 [data-drag]{touch-action:none}
 .grab{flex:none;padding:6px 0 2px}
 .grab i{display:block;width:36px;height:5px;border-radius:3px;background:var(--dim);opacity:.5;margin:0 auto}
-.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 16px calc(28px + var(--tabh) + env(safe-area-inset-bottom))}
+.view{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 16px calc(28px + var(--tabh) + var(--off,0px) + env(safe-area-inset-bottom))}
 .hd{display:flex;align-items:center;gap:10px;padding:6px 0 8px}
 .hd h1{font-size:28px;font-weight:700;letter-spacing:.3px;flex:1}
 .hd .back{display:flex;align-items:center;gap:4px;color:var(--blue);font-size:17px;flex:1;height:36px}
@@ -297,6 +297,10 @@ const COLORS=['#30d158','#0a84ff','#ff9f0a','#bf5af2','#ff375f','#64d2ff','#ffd6
 const HUNT_EMOJI=['⭐','🍄','🦊','🐿️','🌰','🦉','🪵','🌼','🐞','🦔'];
 const LEVELS={kort:{l:'Kort',c:'#30d158'},middel:{l:'Middel',c:'#0a84ff'},lang:{l:'Lang',c:'#bf5af2'}};
 const $=id=>document.getElementById(id);
+// In de iPhone-app (Capacitor) gebruiken we native plugins, op de website de browser
+const NATIVE=!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const PLUG=NATIVE?Capacitor.Plugins:{};
+const WEB_URL='https://thimothijssen.github.io/corversbos/';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clone=o=>JSON.parse(JSON.stringify(o));
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -337,7 +341,7 @@ const b64d=s=>decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/
 function shareLink(r){
   const data={t:r.type,n:r.name,c:r.color,p:encPoly(r.pts)};
   if(r.cps)data.k=r.cps.map(c=>[c.e,c.n,c.h||'',c.t||'']);
-  return location.origin+location.pathname+'#deel='+b64e(JSON.stringify(data));
+  return (NATIVE?WEB_URL:location.origin+location.pathname)+'#deel='+b64e(JSON.stringify(data));
 }
 async function shareRoute(r){
   const url=shareLink(r),text=r.type==='hunt'?`Doe de speurtocht “${r.name}” in het Corversbos`:`Loop de route “${r.name}” in het Corversbos`;
@@ -448,7 +452,16 @@ const boundsOf=rs=>rs.length?L.latLngBounds(rs.flatMap(r=>r.pts)):L.latLngBounds
 /* ---------- locatie & kompas ---------- */
 let watchId=null,lastListRender=0;
 function startGPS(){
-  if(watchId!==null||!navigator.geolocation)return;
+  if(watchId!==null)return;
+  if(NATIVE&&PLUG.Geolocation){
+    watchId='native';
+    PLUG.Geolocation.watchPosition({enableHighAccuracy:true,maximumAge:1000,timeout:20000},(p,err)=>{
+      if(err||!p){if(F.route&&!me)$('dir').textContent='Zet locatie aan';return}
+      if(!fakePos)setMe([p.coords.latitude,p.coords.longitude]);
+    }); // geeft in de app een id terug, geen Promise
+    return;
+  }
+  if(!navigator.geolocation)return;
   watchId=navigator.geolocation.watchPosition(p=>{if(!fakePos)setMe([p.coords.latitude,p.coords.longitude])},
     ()=>{if(F.route&&!me)$('dir').textContent='Zet locatie aan'},{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
 }
@@ -511,7 +524,7 @@ function warnings(r){
 const sheet=$('sheet'),tabbar=$('tabbar');let snap='half',suppressClick=0;
 const tabH=()=>tabbar.classList.contains('hide')?0:tabbar.offsetHeight;
 function snaps(){const H=sheet.offsetHeight,t=tabH();return{full:0,half:Math.max(0,H-Math.round(innerHeight*.5)-t*.3),low:Math.max(0,H-(view==='make'?350:200)-t)}}
-function setSnap(s){snap=s;sheet.style.transform=`translateY(${snaps()[s]}px)`}
+function setSnap(s){snap=s;const y=snaps()[s];sheet.style.transform=`translateY(${y}px)`;sheet.style.setProperty('--off',y+'px')}
 const sheetVisible=()=>sheet.classList.contains('hide')?0:sheet.offsetHeight-snaps()[snap];
 let drag=null;
 sheet.addEventListener('pointerdown',e=>{
@@ -579,13 +592,13 @@ function badge(r){
 }
 function cellHTML(r,h){
   const n=h.filter(x=>x.id===r.id).length,hunt=r.type==='hunt';
-  return `<button class="cell" data-id="${esc(r.id)}">${thumb(r)}<div class="t"><b>${esc(r.name)}</b><div class="m">${hunt?`${r.pts.length} schatten · ${fmt(r.len)}`:`${fmt(r.len)} · ${minutes(r.len)} min`} ${badge(r)}</div>${me?`<div class="m">${fmt(dist(me,r.pts[0]))} hiervandaan</div>`:''}</div>${n?`<span class="done">✓ ${n}×</span>`:''}<span class="chev">${ICON.chev}</span></button>`;
+  return `<button class="cell" data-id="${esc(r.id)}">${thumb(r)}<div class="t"><b>${esc(r.name)}</b><div class="m">${hunt?`${r.pts.length} schatten · ${fmt(r.len)}`:`${fmt(r.len)} · ${minutes(r.len)} min`} ${badge(r)}</div>${me&&dist(me,r.pts[0])<50000?`<div class="m">${fmt(dist(me,r.pts[0]))} hiervandaan</div>`:''}</div>${n?`<span class="done">✓ ${n}×</span>`:''}<span class="chev">${ICON.chev}</span></button>`;
 }
 
 function renderList(){
   lastListRender=Date.now();
   const hunt=tab==='hunts',h=getHistory(),rs=hunt?routes.filter(r=>r.type==='hunt'):filtered();
-  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  const isIOS=!NATIVE&&/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
   const tip=isIOS&&!standalone&&!ls.get(TIPKEY,false)?`<div class="tip"><img src="icon-180.png" alt=""><div style="flex:1"><b>Zet op je beginscherm</b>Tik op <span style="color:var(--blue)">${ICON.share.replace('width="19" height="22"','width="12" height="15"')}</span> en kies <b style="display:inline">Zet op beginscherm</b> voor de echte app-ervaring.</div><button class="circ" id="tipX">${ICON.x}</button></div>`:'';
   $('vList').innerHTML=`
     <div class="hd" data-drag><h1>${hunt?'Speurtocht':'Routes'}</h1><button class="circ blue" id="addBtn" aria-label="Nieuw">${ICON.plus}</button></div>
@@ -618,7 +631,7 @@ function renderDetail(){
     <div class="tiles">
       ${hunt?`<div class="tile"><span>Schatten</span><b>${r.pts.length}</b></div>`:`<div class="tile"><span>Afstand</span><b>${unit(fmt(r.len))}</b></div>`}
       <div class="tile"><span>Duur</span><b>${hunt?'~':''}${minutes(r.len*(hunt?1.3:1))}<small>min</small></b></div>
-      <div class="tile"><span>${best?'Record':'Van jou'}</span><b>${best?fmtTime(best):me?unit(fmt(dist(me,start))):'–'}</b></div>
+      <div class="tile"><span>${best?'Record':'Van jou'}</span><b>${best?fmtTime(best):me&&dist(me,start)<50000?unit(fmt(dist(me,start))):'–'}</b></div>
     </div>
     ${warnings(r)}
     <p class="desc">${hunt?'Volg de pijl van schat naar schat. Hoe dichterbij, hoe warmer! Bij elke plek krijg je een weetje of een opdracht.':isLoop(r)?`Rondje van ${fmt(r.len)} over de paden van het Corversbos. De pijltjes op de kaart laten de looprichting zien.`:`Route van ${fmt(r.len)} door het Corversbos.`}${h.length?` Je hebt ${hunt?'deze speurtocht':'deze route'} ${h.length}× gedaan.`:''}</p>
@@ -722,8 +735,16 @@ $('soundBtn').innerHTML=F.sound?SND_ON:SND_OFF;
 $('soundBtn').onclick=()=>{F.sound=!F.sound;ls.set(SKEY,F.sound);$('soundBtn').innerHTML=F.sound?SND_ON:SND_OFF;if(!F.sound)try{speechSynthesis.cancel()}catch(e){}};
 
 function say(t){if(!F.sound||!('speechSynthesis'in window))return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='nl-NL';u.rate=1.05;speechSynthesis.speak(u)}catch(e){}}
-const buzz=p=>{try{navigator.userActivation&&navigator.userActivation.hasBeenActive&&navigator.vibrate&&navigator.vibrate(p)}catch(e){}};
+const buzz=p=>{try{
+  if(NATIVE&&PLUG.Haptics){ // patroon vertalen naar iOS-haptiek
+    if(Array.isArray(p))p.length>=5?PLUG.Haptics.notification({type:'SUCCESS'}):PLUG.Haptics.impact({style:'HEAVY'});
+    else PLUG.Haptics.impact({style:p<=20?'LIGHT':'MEDIUM'});
+    return;
+  }
+  navigator.userActivation&&navigator.userActivation.hasBeenActive&&navigator.vibrate&&navigator.vibrate(p);
+}catch(e){}};
 async function keepAwake(on){
+  if(NATIVE&&PLUG.KeepAwake){try{on?await PLUG.KeepAwake.keepAwake():await PLUG.KeepAwake.allowSleep()}catch(e){}return}
   try{if(on&&'wakeLock'in navigator&&!F.wake){F.wake=await navigator.wakeLock.request('screen');F.wake.addEventListener('release',()=>F.wake=null)}
       else if(!on&&F.wake){await F.wake.release();F.wake=null}}catch(e){}
 }
@@ -926,6 +947,7 @@ function confetti(c,count){
 
 /* ---------- start ---------- */
 setTabH();setTab('routes');setSnap('half');
+addEventListener('load',()=>{setTabH();setSnap(snap);if(view==='list')fitWithSheet(boundsOf(filtered()))});
 setOnline();startGPS();loadWeather();checkImport();
 if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

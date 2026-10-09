@@ -1,0 +1,10 @@
+{
+  "appId": "nl.thijssen.corversbos",
+  "appName": "Corversbos",
+  "webDir": "www",
+  "backgroundColor": "#000000",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "Corversbos"
+  }
+}

@@ -1,5 +1,5 @@
 // Netwerk eerst, cache als terugval: zo werkt de app ook zonder bereik in het bos
-const C='corversbos-v4';
+const C='corversbos-v5';
 const CORE=['./','index.html','manifest.json','icon-180.png','icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'];

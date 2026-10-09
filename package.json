@@ -1,0 +1,20 @@
+{
+  "name": "corversbos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wandelapp voor het Corversbos in Hilversum",
+  "scripts": {
+    "serve": "python3 -m http.server 8124 --directory www",
+    "ios": "cap sync ios && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/geolocation": "^8.2.3",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3"
+  }
+}
